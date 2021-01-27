@@ -13,19 +13,12 @@ long* TSP::getPath() const {
   return this->path;
 }
 
-bool** TSP::getMatrixPath() const {
-  return this->matrix_path;
-}
-
 double** TSP::getDistMatrix() const {
   return this->dist_matrix;
 }
 
 TSP::~TSP() {
   delete[] path;
-  for (long i = 0; i < size; i++)
-    delete[] matrix_path[i];
-  delete[] matrix_path;
 }
 
 template <class T>
@@ -38,8 +31,9 @@ void TSP::mirror_matrix(T** matrix, long size_t) {
   }
 }
 
-TSP::TSP(double** dist_matrix, long node_num) {
+TSP::TSP(double** dist_matrix, double** dist_pseudo_matrix, long node_num) {
   this->dist_matrix = dist_matrix;
+  this->dist_pseudo_matrix = dist_pseudo_matrix;
   this->size = node_num;
 }
 
@@ -54,16 +48,7 @@ void TSP::printDecisionPath() {
   for (long i = 0; i < this->size; i++) {
     std::cout << this->path[i] + 1 << " -> ";
   }
-  std::cout << this->path[this->size] + 1 << std::endl;
-}
-
-void TSP::printMatrixPath() {
-  for (long i = 0; i < this->size; i++) {
-  for (long j = 0; j < this->size; j++) {
-    std::cout << matrix_path[i][j] << " ";
-  }
-  std::cout << std::endl;
-  }
+  std::cout << this->path[0] + 1 << std::endl;
 }
 
 void TSP::printMatrixDist() {
@@ -75,17 +60,37 @@ void TSP::printMatrixDist() {
   }
 }
 
-void TSP::createInitialDecision() {
-  this->path = new long[size + 1];
-  this->matrix_path = new bool* [size];
-  double** dist_matrix = getDistMatrix();
-  long start_vertex = std::rand() % size, path_i = 0, initial_vertex;
+void TSP::randomNodeStarter(long nodes, long iterations) {
+  long* best_path = nullptr;
+  double best_cost = std::numeric_limits<double>::infinity();
 
-  for (long i = 0; i < size; i++) {
-    this->matrix_path[i] = new bool[size] {false};
-    //for (long j = 0; j < size; j++)
-    //  this->matrix_path[i][j] = false;
+  long _size = nodes;
+
+  if (nodes == -1)
+    _size = this->size;
+
+  for (long i = 0; i < _size; i++) {
+    this->createInitialDecision(std::rand() % this->size);
+    this->iteratedLocalSearch(iterations);
+    if (best_cost > this->path_cost) {
+      best_cost = this->path_cost;
+      best_path = this->path;
+    }
   }
+  this->path_cost = best_cost;
+  this->path = best_path;
+  std::cout << "Best Score: " << best_cost << std::endl;
+  std::cout << "Best route: " << std::endl;
+  this->printDecisionPath();
+}
+
+void TSP::createInitialDecision(int _start_vertex) {
+  this->path = new long[this->size];
+  double** dist_matrix = getDistMatrix();
+  long start_vertex = _start_vertex, path_i = 0, initial_vertex;
+
+  if (start_vertex == -1)
+    start_vertex = std::rand() % size;
 
   this->path[path_i++] = start_vertex;
   initial_vertex = start_vertex;
@@ -99,102 +104,85 @@ void TSP::createInitialDecision() {
         min_i = i;
       }
     }
-    this->matrix_path[start_vertex][min_i] = true;
     start_vertex = min_i;
     this->path[path_i++] = start_vertex;
   }
 
-  this->matrix_path[this->path[path_i - 1]][initial_vertex] = true;
-  this->path[path_i] = initial_vertex;
-  this->path_cost = calculatePathCost(dist_matrix, this->path, size + 1);
+  this->path_cost = calculatePathCost(this->path, this->size);
 }
 
-double TSP::calculatePathCost(double** dist_matrix, long* path, long path_size) {
+double TSP::calculatePathCost(long* path, long size, bool pseudo) {
   double cost = 0.0;
-  for (long i = 0; i < path_size; i++) {
+  long i;
+  for (i = 0; i < size - 1; i++) {
     long j = i + 1;
-    if (i == path_size - 1)
-      j = 0;
-    cost += dist_matrix[path[i]][path[j]];
+    if (pseudo)
+      cost += dist_pseudo_matrix[path[i]][path[j]];
+    else
+      cost += dist_matrix[path[i]][path[j]];
   }
+  if (pseudo)
+    cost += dist_pseudo_matrix[path[i]][path[0]];
+  else
+    cost += dist_matrix[path[i]][path[0]];
   return cost;
 }
 
-void TSP::createMatrixPath() {
-  delete[] this->matrix_path;
-  this->matrix_path = new bool* [this->size];
-  for (long i = 0; i < this->size; i++) {
-    this->matrix_path[i] = new bool[this->size]{false};
+long* TSP::TwoOptSwap(long& i, long& j, long size) {
+  long* new_path = new long[size] { -1 };
+  
+  for (long m = 0; m < i; m++)
+    new_path[m] = this->path[m];
+
+  long dec = 0;
+  for (long c = i; c <= j; c++)
+  {
+    new_path[c] = this->path[j - dec];
+    dec++;
   }
-  for (long i = 0; i < this->size; i++) {
-    this->matrix_path[this->path[i]][this->path[i + 1]] = true;
-  }
+
+  for (long n = j + 1; n < size; n++)
+    new_path[n] = this->path[n];
+
+  return new_path;
 }
 
 bool TSP::localSearch() {
   std::vector<Change> change_list;
   double** dist_matrix = getDistMatrix();
 
-  for (long i = 0; i < size - 1; i++) {
-    for (long j = i + 1; j < size - 1; j++) {
-      if (this->path[i] == this->path[j + 1] || this->path[i + 1] == this->path[j])
-        continue;
-
-      //std::cout << this->path[i] + 1 << " -> " << this->path[i + 1] + 1 << ", " << this->path[j] + 1 << " -> " << this->path[j + 1] + 1 << std::endl;
-
-      Change change;
-      change.rvertex_1 = path[i + 1];
-      change.lvertex_2 = path[j];
-      //change.rvertex_2 = path[j + 1];
-
-      bool flag = false;
-
-      if ((this->path[i] == 1) && (this->path[i + 1] == 28) && (this->path[j] == 47) && (this->path[j + 1] == 38)) {
-        for (int i = 0; i < size + 1; i++)
-          std::cout << path[i] << " ";
-        std::cout << " COST: " <<this->path_cost << std::endl;
-        flag = true;
-      }
-
-      //// change by 2-opt
-      this->path[i + 1] = change.lvertex_2;
-      this->path[j] = change.rvertex_1;
-
-      change.cost = calculatePathCost(dist_matrix, path, size + 1);
-
-      if (flag) {
-        for (int i = 0; i < size + 1; i++)
-          std::cout << path[i] << " ";
-        std::cout << " COST: " << change.cost << std::endl;
-      }
+  for (long i = 0; i < this->size - 1; i++) {
+    for (long j = i + 1; j < this->size; j++) {
+      long* new_path = TwoOptSwap(i, j, this->size);
+      double cost = calculatePathCost(new_path, this->size);
 
       if (this->first_step) {
 
-        if (change.cost < this->path_cost) {
-          this->path_cost = change.cost;
-          std::cout << "FIRST STEP: NEW COST: " << this->path_cost << std::endl;
+        if (cost < this->path_cost) {
+          this->path_cost = cost;
+          delete[] this->path;
+          this->path = new_path;
           return true;
         }
       }
       else {
-        //if ((this->path[i] == 1) && (this->path[i + 1] == 28) && (this->path[j] == 47) && (this->path[j + 1] == 38))
-        //{
-        //  std::cout << "PREV COST: " << this->path_cost << std::endl;
-        //  std::cout << "NEW COST: " << change.cost << std::endl;
-        //}
-        //std::cout << "PREV: " << this->path[i] + 1 << " -> " << change.rvertex_1 + 1<< std::endl;
-        //std::cout << "NEW: " << change.lvertex_2 + 1 << " -> " << this->path[j + 1] + 1 << std::endl;
-        change.lvertex_2_index = i + 1;
-        change.rvertex_1_index = j;
+        Change change;
+        change.cost = cost;
+        change.node1 = i;
+        change.node2 = j;
         change_list.push_back(change);
       }
 
-      this->path[i + 1] = change.rvertex_1;
-      this->path[j] = change.lvertex_2;
+      delete[] new_path;
+
     }
   }
+
+
+
   if (change_list.size() == 0)
     return false;
+
   Change min_change;
 
   min_change.cost = std::numeric_limits<double>::infinity();
@@ -203,27 +191,26 @@ bool TSP::localSearch() {
       min_change = change;
   }
 
-  if (min_change.cost <= this->path_cost) {
-    this->path[min_change.lvertex_2_index] = min_change.lvertex_2;
-    this->path[min_change.rvertex_1_index] = min_change.rvertex_1;
-
+  if (min_change.cost < this->path_cost) {
+    long* new_path = TwoOptSwap(min_change.node1, min_change.node2, this->size);
+    delete[] this->path;
+    this->path = new_path;
     this->path_cost = min_change.cost;
-
-    // std::cout << this->path[i + 1] + 1 << " -> " << this->path[j] + 1 << std::endl;
-
-    std::cout << "STEPEST: NEW COST: " << this->path_cost << std::endl;
     return true;
   }
   else 
     return false;
 }
 
-void TSP::iteratedLocalSearch() {
-  //createInitialDecision();
-  //localSearch();
-  while (this->localSearch());
-  std::cout << "RESULT PATH: " << std::endl;
-  this->printDecisionPath();
-  std::cout << "RESULT COST: " << this->path_cost << std::endl;
+void TSP::iteratedLocalSearch(long iterations) {
+  if (iterations == -1)
+    while (this->localSearch());
+  else
+    for (long i = 0; i < iterations; i++) {
+      std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
+      this->localSearch();
+    }
+  //std::cout << "RESULT COST: " << this->path_cost << std::endl;
+  //std::cout << "RESULT PATH: " << std::endl;
+  //this->printDecisionPath();
 }
-
