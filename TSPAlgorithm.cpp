@@ -60,18 +60,24 @@ void TSP::printMatrixDist() {
   }
 }
 
-void TSP::randomNodeStarter(long nodes, long iterations) {
+void TSP::randomNodeStarter(DataReader* reader, std::string file_name, long node_start, long node_finish, long iterations) {
   long* best_path = nullptr;
   double best_cost = std::numeric_limits<double>::infinity();
 
-  long _size = nodes;
+  if (node_start == -1 && node_finish == -1) {
+    node_start = 0;
+    node_finish = this->size;
+  }
+  else if (node_start != -1 && node_finish == -1) {
+    node_finish = this->size;
+  }
+  else if (node_start == -1 && node_finish != -1) {
+    node_start = 0;
+  }
 
-  if (nodes == -1)
-    _size = this->size;
-
-  for (long i = 0; i < _size; i++) {
-    this->createInitialDecision(std::rand() % this->size);
-    this->iteratedLocalSearch(iterations);
+  for (long i = node_start; i < node_finish; i++) {
+    this->createInitialDecision(i);
+    this->iteratedLocalSearch(reader, file_name, iterations);
     if (best_cost > this->path_cost) {
       best_cost = this->path_cost;
       best_path = this->path;
@@ -79,9 +85,10 @@ void TSP::randomNodeStarter(long nodes, long iterations) {
   }
   this->path_cost = best_cost;
   this->path = best_path;
-  std::cout << "Best Score: " << best_cost << std::endl;
-  std::cout << "Best route: " << std::endl;
-  this->printDecisionPath();
+  reader->SavePath(file_name, this->path, this->path_cost, this->size);
+  //std::cout << "Best Score: " << best_cost << std::endl;
+  //std::cout << "Best route: " << std::endl;
+  //this->printDecisionPath();
 }
 
 void TSP::createInitialDecision(int _start_vertex) {
@@ -202,13 +209,22 @@ bool TSP::localSearch() {
     return false;
 }
 
-void TSP::iteratedLocalSearch(long iterations) {
-  if (iterations == -1)
-    while (this->localSearch());
+void TSP::iteratedLocalSearch(DataReader* reader, std::string file_name, long iterations) {
+  if (iterations == -1) {
+    long i = 0;
+    while (this->localSearch()) {
+      std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
+      i++;
+    }
+    reader->SavePath(file_name, this->path, this->path_cost, this->size);
+  }
   else
     for (long i = 0; i < iterations; i++) {
       std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
-      this->localSearch();
+      bool result = this->localSearch();
+      reader->SavePath(file_name, this->path, this->path_cost, this->size);
+      if (!result)
+        return;
     }
   //std::cout << "RESULT COST: " << this->path_cost << std::endl;
   //std::cout << "RESULT PATH: " << std::endl;

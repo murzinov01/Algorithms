@@ -7,7 +7,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
+#include <thread>
 
 struct node_info {
   long id;
@@ -80,6 +80,19 @@ public:
       out << data[path[node_num - 1]].id << " " << data[path[0]].id << std::endl;
     }
   }
+
+  void SavePath(std::string file_name, long* path, double& cost, long& size) {
+    std::ofstream out;
+    out.open(file_name);
+
+    if (out.is_open())
+    {
+      for (long i = 0; i < size; i++)
+        out << data[path[i]].id << " ";
+
+      out << "COST: " << " " << cost << std::endl;
+    }
+  }
 };
 
 
@@ -109,7 +122,7 @@ public:
   void createInitialDecision(int start_vertex=-1);
   bool localSearch();
   long* TwoOptSwap(long& i, long& j, long size);
-  void iteratedLocalSearch(long interations=-1);
-  void randomNodeStarter(long nodes=-1, long iterations=-1);
+  void iteratedLocalSearch(DataReader* reader, std::string file_name, long interations=-1);
+  void randomNodeStarter(DataReader* reader, std::string file_name, long node1=-1, long node2=-1, long iterations=-1);
 };
 #endif  // INCLUDE_TSPALGORITHM_H_
