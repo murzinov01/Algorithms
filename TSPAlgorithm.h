@@ -123,6 +123,7 @@ public:
   bool localSearch();
   long* TwoOptSwap(long& i, long& j, long size);
   void iteratedLocalSearch(DataReader* reader, std::string file_name, long interations=-1);
-  void randomNodeStarter(DataReader* reader, std::string file_name, long node1=-1, long node2=-1, long iterations=-1);
+  void randomNodeStarter(DataReader* reader, std::string file_name, std::string dir_name, long node1=-1, long node2=-1, long iterations=-1);
+  void finBestGreedy(long vertex_num);
 };
 #endif  // INCLUDE_TSPALGORITHM_H_

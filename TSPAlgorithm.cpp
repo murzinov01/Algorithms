@@ -48,7 +48,7 @@ void TSP::printDecisionPath() {
   for (long i = 0; i < this->size; i++) {
     std::cout << this->path[i] + 1 << " -> ";
   }
-  std::cout << this->path[0] + 1 << std::endl;
+  // std::cout << this->path[0] + 1 << std::endl;
 }
 
 void TSP::printMatrixDist() {
@@ -60,9 +60,11 @@ void TSP::printMatrixDist() {
   }
 }
 
-void TSP::randomNodeStarter(DataReader* reader, std::string file_name, long node_start, long node_finish, long iterations) {
+void TSP::randomNodeStarter(DataReader* reader, std::string file_name, std::string dir_name, long node_start, long node_finish, long iterations) {
   long* best_path = nullptr;
   double best_cost = std::numeric_limits<double>::infinity();
+
+  std::string file_name_init = file_name;
 
   if (node_start == -1 && node_finish == -1) {
     node_start = 0;
@@ -75,7 +77,9 @@ void TSP::randomNodeStarter(DataReader* reader, std::string file_name, long node
     node_start = 0;
   }
 
+
   for (long i = node_start; i < node_finish; i++) {
+    file_name = dir_name + std::to_string(i) + file_name_init;
     this->createInitialDecision(i);
     this->iteratedLocalSearch(reader, file_name, iterations);
     if (best_cost > this->path_cost) {
@@ -86,7 +90,7 @@ void TSP::randomNodeStarter(DataReader* reader, std::string file_name, long node
   this->path_cost = best_cost;
   this->path = best_path;
   reader->SavePath(file_name, this->path, this->path_cost, this->size);
-  //std::cout << "Best Score: " << best_cost << std::endl;
+  std::cout << "Best Score: " << best_cost << std::endl;
   //std::cout << "Best route: " << std::endl;
   //this->printDecisionPath();
 }
@@ -94,28 +98,35 @@ void TSP::randomNodeStarter(DataReader* reader, std::string file_name, long node
 void TSP::createInitialDecision(int _start_vertex) {
   this->path = new long[this->size];
   double** dist_matrix = getDistMatrix();
-  long start_vertex = _start_vertex, path_i = 0, initial_vertex;
+  long* visited = new long[this->size]{ 0 };
+  long start_vertex = _start_vertex, path_i = 0;
 
   if (start_vertex == -1)
     start_vertex = std::rand() % size;
 
-  this->path[path_i++] = start_vertex;
-  initial_vertex = start_vertex;
+  visited[start_vertex] = 1;
+  this->path[path_i] = start_vertex;
+  path_i++;
 
   while (path_i != size) {
     double min_distance = std::numeric_limits<double>::infinity();
     long min_i = 0;
     for (long i = 0; i < size; i++) {
-      if (!checkInArray(path, size, i) && dist_matrix[start_vertex][i] < min_distance) {
+      if (!visited[i] && dist_matrix[start_vertex][i] < min_distance) {
         min_distance = dist_matrix[start_vertex][i];
         min_i = i;
       }
     }
+    visited[min_i] = 1;
     start_vertex = min_i;
     this->path[path_i++] = start_vertex;
   }
 
+  delete[] visited;
   this->path_cost = calculatePathCost(this->path, this->size);
+  //std::cout << "INITIAL COST: " << this->path_cost << std::endl;
+  //std::cout << "INITIAL PATH: " << std::endl;
+  //this->printDecisionPath();
 }
 
 double TSP::calculatePathCost(long* path, long size, bool pseudo) {
@@ -185,8 +196,6 @@ bool TSP::localSearch() {
     }
   }
 
-
-
   if (change_list.size() == 0)
     return false;
 
@@ -213,14 +222,14 @@ void TSP::iteratedLocalSearch(DataReader* reader, std::string file_name, long it
   if (iterations == -1) {
     long i = 0;
     while (this->localSearch()) {
-      std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
+      //std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
       i++;
+      reader->SavePath(file_name, this->path, this->path_cost, this->size);
     }
-    reader->SavePath(file_name, this->path, this->path_cost, this->size);
   }
   else
     for (long i = 0; i < iterations; i++) {
-      std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
+      //std::cout << "Iteration: " << i + 1 << " COST: " << this->path_cost << std::endl;
       bool result = this->localSearch();
       reader->SavePath(file_name, this->path, this->path_cost, this->size);
       if (!result)
@@ -229,4 +238,22 @@ void TSP::iteratedLocalSearch(DataReader* reader, std::string file_name, long it
   //std::cout << "RESULT COST: " << this->path_cost << std::endl;
   //std::cout << "RESULT PATH: " << std::endl;
   //this->printDecisionPath();
+}
+
+void TSP::finBestGreedy(long vertex_num) {
+  double best_cost = std::numeric_limits<double>::infinity();
+  long* best_path = nullptr;
+
+  for (unsigned int i = 0; i < vertex_num; i++) {
+    std::cout << "FROM VERTEX: " << i << std::endl;
+    createInitialDecision(i);
+    if (this->path_cost < best_cost) {
+      best_cost = this->path_cost;
+      best_path = this->path;
+    }
+  }
+  this->path_cost = best_cost;
+  this->path = best_path;
+
+  std::cout << "BEST GREEDY COST: " << best_cost << std::endl;
 }
