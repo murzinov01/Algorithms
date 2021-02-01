@@ -107,23 +107,23 @@ void FinderRandom3() {
 }
 
 int main() {
-  DataReader reader("mona_1000.txt");
-  TSP tsp(reader.dist_matrix, reader.dist_pseudo_matrix, reader.node_num);
-  tsp.first_step = false;
-  std::string dir_name = "C:\\Users\\user\\source\\repos\\Local Search\\Local Search\\Mona\\";
+  //DataReader reader("mona_1000.txt");
+  //TSP tsp(reader.dist_matrix, reader.dist_pseudo_matrix, reader.node_num);
+  //tsp.first_step = false;
+  //std::string dir_name = "C:\\Users\\user\\source\\repos\\Local Search\\Local Search\\Mona\\";
   //tsp.randomNodeStarter(&reader, "Result.txt", dir_name, 2, 1000, -1);
-  //std::thread t1 (FinderMona);
-  //std::thread t2 (FinderLu);
-  //std::thread t3 (FinderJa);
-  //std::thread t4 (FinderRandom1);
-  //std::thread t5 (FinderRandom2);
-  //std::thread t6 (FinderRandom3);
-  //t1.join();
-  //t2.join();
-  //t3.join();
-  //t4.join();
-  //t5.join();
-  //t6.join();
+  std::thread t1 (FinderMona);
+  std::thread t2 (FinderLu);
+  std::thread t3 (FinderJa);
+  std::thread t4 (FinderRandom1);
+  std::thread t5 (FinderRandom2);
+  std::thread t6 (FinderRandom3);
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  t5.join();
+  t6.join();
   //FinderJa();
   //FinderRandom1();
   //FinderRandom2();
@@ -132,18 +132,18 @@ int main() {
   //TSP tsp(reader.dist_matrix, reader.dist_pseudo_matrix, reader.node_num);
   //tsp.first_step = false;
 
-  //std::cout << "BEST RESULT: " << findMinResult() << std::endl;
+  // std::cout << "BEST RESULT: " << findMinResult() << std::endl;
 
   // tsp.randomNodeStarter(&reader, "Result.txt", 122, 123, -1);
   //tsp.finBestGreedy(1000);
   //tsp.iteratedLocalSearch(&reader, "FROM_BEST_GREEDY.txt", -1);
-  std::thread t1(&TSP::randomNodeStarter, tsp, &reader, "Result.txt", dir_name, 98, 231, -1);
-  std::thread t2(&TSP::randomNodeStarter, tsp, &reader, "Result.txt", dir_name, 248, 381, -1);
-  std::thread t3(&TSP::randomNodeStarter, tsp, &reader, "Result.txt", dir_name, 398, 531, -1);
+  //std::thread t1(&TSP::randomNodeStarter, tsp, &reader, "Result.txt", dir_name, 620, 640, -1);
+  //std::thread t2(&TSP::randomNodeStarter, tsp, &reader, "Result.txt", dir_name, 800, 820, -1);
+  //std::thread t3(&TSP::randomNodeStarter, tsp, &reader, "Result.txt", dir_name, 940, 960, -1);
 
-  t1.join();
-  t2.join();
-  t3.join();
+  //t1.join();
+  //t2.join();
+  //t3.join();
   //reader.saveGraphEdges(tsp.getPath(), "Edges.txt");
   return 0;
 }
