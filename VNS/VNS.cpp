@@ -9,7 +9,8 @@ VNS::VNS() {
 }
 VNS::VNS(std::string file_name) {
   ReadData(file_name);
-  machinesSolution = partsSolution = nullptr;
+  CreateInitialDecision();
+//  this->neighbours[0] = MoveColumns;
 }
 
 
@@ -100,18 +101,59 @@ void VNS::ReadData(std::string file_name) {
     }
   }
   in.close();
+  this->machinesSolution = new unsigned[this->machines];
+  this->partsSolution = new unsigned[this->parts];
 }
 
-double VNS::TargetFunction() {
-  return 0.0;
+double VNS::TargetFunction(unsigned* newMachinesSolution,
+                           unsigned* newPartsSolution) {
+  
+  if (newMachinesSolution == nullptr)
+    newMachinesSolution = this->machinesSolution;
+  if (newPartsSolution == nullptr)
+    newPartsSolution = this->partsSolution;
+  
+  
+  unsigned zeroes_in = 0;
+  unsigned ones_in = 0;
+  for (int i = 0; i < this->machines; i++){
+    for (int j = 0; j < this->parts; j++){
+      if (newMachinesSolution[i] ==
+          newPartsSolution[j]){
+        if (this->matrix[i][j])
+          ones_in++;
+        else
+          zeroes_in++;
+      }
+    }
+  }
+  
+  return (double)ones_in/(this->all_ones + zeroes_in);
 }
 
 void VNS::CreateInitialDecision() {
-
+  unsigned avg_clusters = (2 + std::min(machines, parts) / 2);
+  unsigned cur_cluster = 1;
+  for (int i = 0; i < machines; i++){
+    if (cur_cluster > avg_clusters)
+      cur_cluster = 1;
+    machinesSolution[i] = cur_cluster++;
+  }
+  
+  cur_cluster = 1;
+  for (int i = 0; i < parts; i++){
+    if (cur_cluster > avg_clusters)
+      cur_cluster = 1;
+    partsSolution[i] = cur_cluster++;
+  }
+  
+  this->bestTarget = this->TargetFunction();
+  
 }
 
 void VNS::VND() {
-
+  MoveRows();
+  MoveColumns();
 }
 
 void VNS::GeneralVNS() {
@@ -120,11 +162,62 @@ void VNS::GeneralVNS() {
 
 // For Search in VND
 void VNS::MoveRows() {
-
+  Permutation(true);
 }
 
 void VNS::MoveColumns() {
+  Permutation(false);
+}
 
+void VNS::Permutation(bool isRows){
+  unsigned targetSize;
+  unsigned* targetVector;
+  if (isRows){
+    targetSize = machines;
+    targetVector = machinesSolution;
+  } else {
+    targetSize = parts;
+    targetVector = partsSolution;
+  }
+  
+  double bestTargetInSolution = this->bestTarget;
+  unsigned* bestVectorSolution = new unsigned[targetSize];
+  
+  for (unsigned i = 0; i < targetSize - 1; i++){
+    for (unsigned j = i + 1; j < targetSize; j++){
+      // permutation
+      unsigned* newVectorSolution = new unsigned[targetSize];
+      for (unsigned n = 0; n < targetSize; n++)
+        newVectorSolution[n] = targetVector[n];
+      unsigned tmp = newVectorSolution[i];
+      newVectorSolution[i] = newVectorSolution[j];
+      newVectorSolution[j] = tmp;
+      // calculate target function after permutation
+      double target = isRows ? TargetFunction(newVectorSolution, nullptr) :
+                               TargetFunction(nullptr, newVectorSolution);
+      // check changes
+      if (target > bestTargetInSolution) {
+        delete [] bestVectorSolution;
+        bestVectorSolution = newVectorSolution;
+        bestTargetInSolution = target;
+      } else {
+        delete [] newVectorSolution;
+      }
+    }
+  }
+  std::cout<<"";
+  // implement changes
+  if (this->bestTarget < bestTargetInSolution){
+    this->bestTarget = bestTargetInSolution;
+    delete [] targetVector;
+    if (isRows)
+      this->machinesSolution = bestVectorSolution;
+    else
+      this->partsSolution = bestVectorSolution;
+  } else {
+    delete [] bestVectorSolution;
+  }
+  
 }
 
 

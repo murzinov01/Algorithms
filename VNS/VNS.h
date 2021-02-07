@@ -15,9 +15,17 @@ private:
   unsigned* machinesSolution;
   unsigned* partsSolution;
   unsigned machines, parts, all_ones;
-  double TargetFunction();
-
-
+  double bestTarget = 0.0;
+  double TargetFunction(unsigned* newMachinesSolution = nullptr,
+                        unsigned* newPartsSolution = nullptr);
+  // For Search in VND
+  void MoveRows();
+  void MoveColumns();
+  void Permutation(bool isRows);
+  // For shaking in General VNS
+  void DevideClusters();
+  void MergeClusters();
+//  void (VNS::*neighbours[2])() = { VNS::MoveRows , VNS::MoveColumns};
 
 public:
   VNS();
@@ -28,6 +36,7 @@ public:
   unsigned* GetMachinesSolution() const;
   unsigned* GetPartsSolution() const;
   bool** GetMatrix() const;
+  double GetBestTarget() const { return bestTarget; }
 
   void PrintMatrix();
   void PrintMachinesSolution();
@@ -37,15 +46,6 @@ public:
   void CreateInitialDecision();
   void VND();
   void GeneralVNS();
-
-  // For Search in VND
-  void MoveRows();
-  void MoveColumns();
-
-
-  // For shaking in General VNS
-  void DevideClusters();
-  void MergeClusters();
 };
 
 #endif  // INCLUDE_VNS_H_
