@@ -10,7 +10,7 @@ VNS::VNS() {
 VNS::VNS(std::string file_name) {
   ReadData(file_name);
   CreateInitialDecision();
-//  this->neighbours[0] = MoveColumns;
+//  this->neighbours.push_back(&this->MoveColumns());
 }
 
 
@@ -133,6 +133,7 @@ double VNS::TargetFunction(unsigned* newMachinesSolution,
 
 void VNS::CreateInitialDecision() {
   unsigned avg_clusters = (2 + std::min(machines, parts) / 2);
+  this->clustersNum = avg_clusters;
   unsigned cur_cluster = 1;
   for (int i = 0; i < machines; i++){
     if (cur_cluster > avg_clusters)
@@ -154,6 +155,16 @@ void VNS::CreateInitialDecision() {
 void VNS::VND() {
   MoveRows();
   MoveColumns();
+//  MergeClusters();
+//  MergeClusters();
+  MergeClusters();
+  
+  PrintMachinesSolution();
+  PrintPartsSolution();
+  
+  DivideClusters();
+//  MoveColumns();
+//  MoveRows();
 }
 
 void VNS::GeneralVNS() {
@@ -205,7 +216,6 @@ void VNS::Permutation(bool isRows){
       }
     }
   }
-  std::cout<<"";
   // implement changes
   if (this->bestTarget < bestTargetInSolution){
     this->bestTarget = bestTargetInSolution;
@@ -222,10 +232,106 @@ void VNS::Permutation(bool isRows){
 
 
 // For shaking in General VNS
-void VNS::DevideClusters() {
+void VNS::DivideClusters() {
+  if (clustersNum >= std::min(machines, parts))
+    return;
+  
+  for (unsigned i = 1; i <= clustersNum; i++){
+    unsigned* curMachinesSoultion = DivideInTwo(i, machinesSolution, machines);
+    if (curMachinesSoultion == nullptr)
+      continue;
+    unsigned* curPartsSoultion = DivideInTwo(i, partsSolution, parts);
+    if (curMachinesSoultion == nullptr)
+      continue;
+    
+    delete [] machinesSolution;
+    delete [] partsSolution;
+    machinesSolution = curMachinesSoultion;
+    partsSolution = curPartsSoultion;
+    bestTarget = TargetFunction();
+  }
 
 }
 
-void VNS::MergeClusters() {
+unsigned* VNS::DivideInTwo(unsigned& c, unsigned* targetVectorSolution, unsigned& size, float percent){
+  unsigned* curSolution = new unsigned[size];
+  // count cluster's entities in vector
+  unsigned clusterEntities = 0;
+  for (int i = 0; i < size; i++)
+    if (targetVectorSolution[i] == c)
+      clusterEntities++;
+  
+  if (clusterEntities <= 1)
+    return nullptr;
+  
+  unsigned newClusterEntites = percent * clusterEntities;
+  // make division
+  unsigned delimiterCounter = 0;
+  for (unsigned i = 0; i < size; i++){
+    if (targetVectorSolution[i] == c && delimiterCounter < newClusterEntites){
+      curSolution[i] = clustersNum + 1;
+      delimiterCounter++;
+    } else {
+      curSolution[i] = targetVectorSolution[i];
+    }
+  }
+  
+  return curSolution;
+}
 
+
+void VNS::MergeClusters(bool findBest) {
+  if (clustersNum <= 2)
+    return;
+  
+  double bestTargetInSolution = 0;
+  unsigned best_c1 = 0;
+  unsigned best_c2 = 0;
+  
+//  if (findBest){
+    for (unsigned i = 1; i <= clustersNum; i++){
+      for (unsigned j = i + 1; j <= clustersNum; j++){
+        // (i , j) - clussters to be merged
+        unsigned* curMachinesSoultion = MergeTwo(i, j, machinesSolution, machines);
+        unsigned* curPartsSoultion = MergeTwo(i, j, partsSolution, parts);
+        // check changes
+        double target = TargetFunction(curMachinesSoultion, curPartsSoultion);
+        if (target > bestTargetInSolution){
+          bestTargetInSolution = target;
+          best_c1 = i;
+          best_c2 = j;
+        }
+        delete [] curMachinesSoultion;
+        delete [] curPartsSoultion;
+      }
+    }
+//  } else {
+//    srand (std::time(NULL));
+//    best_c1 = std::rand() %
+//  }
+  
+  
+  // implement changes
+  if (best_c1 && best_c2){
+    machinesSolution = MergeTwo(best_c1, best_c2, machinesSolution, machines);
+    partsSolution = MergeTwo(best_c1, best_c2, partsSolution, parts);
+    bestTarget = bestTargetInSolution;
+    clustersNum--;
+  }
+}
+
+unsigned* VNS::MergeTwo(unsigned& c1, unsigned& c2,
+                        unsigned* targetVectorSolution, unsigned& size){
+  unsigned* curSolution = new unsigned[size];
+  
+  for (unsigned m = 0; m < size; m++){
+  if (targetVectorSolution[m] == c2)
+    curSolution[m] = c1;
+  else if (targetVectorSolution[m] > c1)
+    curSolution[m] = targetVectorSolution[m] - 1;
+  else
+    curSolution[m] = targetVectorSolution[m];
+  }
+  
+  return curSolution;
 }

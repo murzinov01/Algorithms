@@ -7,7 +7,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
-
+#include <time.h>
 
 class VNS {
 private:
@@ -18,14 +18,19 @@ private:
   double bestTarget = 0.0;
   double TargetFunction(unsigned* newMachinesSolution = nullptr,
                         unsigned* newPartsSolution = nullptr);
+  unsigned clustersNum;
   // For Search in VND
   void MoveRows();
   void MoveColumns();
   void Permutation(bool isRows);
   // For shaking in General VNS
-  void DevideClusters();
-  void MergeClusters();
-//  void (VNS::*neighbours[2])() = { VNS::MoveRows , VNS::MoveColumns};
+  void DivideClusters();
+  unsigned* DivideInTwo(unsigned& c, unsigned* targetVectorSolution,
+                        unsigned& size,  float percent = 0.5f);
+  void MergeClusters(bool findBest=false);
+  unsigned* MergeTwo(unsigned& c1, unsigned& c2,
+                     unsigned* targetVectorSolution, unsigned& size);
+  std::vector <void(*)()> neighbours;
 
 public:
   VNS();
