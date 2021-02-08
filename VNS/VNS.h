@@ -8,6 +8,7 @@
 #include <sstream>
 #include <vector>
 #include <time.h>
+#include <algorithm>
 
 class VNS {
 private:
@@ -24,10 +25,10 @@ private:
   void MoveColumns();
   void Permutation(bool isRows);
   // For shaking in General VNS
-  void DivideClusters();
+  void DivideClusters(bool findBest = false);
   unsigned* DivideInTwo(unsigned& c, unsigned* targetVectorSolution,
                         unsigned& size,  float percent = 0.5f);
-  void MergeClusters(bool findBest=false);
+  void MergeClusters(bool findBest = false);
   unsigned* MergeTwo(unsigned& c1, unsigned& c2,
                      unsigned* targetVectorSolution, unsigned& size);
   std::vector <void(*)()> neighbours;
