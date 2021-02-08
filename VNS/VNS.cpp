@@ -5,7 +5,7 @@
 VNS::VNS() {
   matrix = nullptr;
   machinesSolution = partsSolution = nullptr;
-  machines = parts = all_ones = 0;
+  machines = parts = all_ones = clustersNum = 0;
 }
 VNS::VNS(std::string file_name) {
   ReadData(file_name);
@@ -42,16 +42,16 @@ void VNS::PrintMatrix() {
   }
 }
 void VNS::PrintMachinesSolution() {
-  std::cout << "Machines: (";
+  std::cout << "(";
   for (unsigned i = 0; i < machines; i++)
     std::cout << machinesSolution[i] << " ";
-  std::cout << ")" << std::endl;
+  std::cout << ")";
 }
 void VNS::PrintPartsSolution() {
-  std::cout << "Parts: (";
+  std::cout << "(";
   for (unsigned i = 0; i < parts; i++)
     std::cout << partsSolution[i] << " ";
-  std::cout << ")" << std::endl;
+  std::cout << ")";
 }
 
 
@@ -63,22 +63,14 @@ void VNS::ReadData(std::string file_name) {
 
   // Get size of matrix
   getline(in, line);
-  bool find_firts_num = false;
-  unsigned j = 0;
-  for (unsigned i = 0; i < line.size(); i++) {
-
-    if (line[i] == ' ') {
-      find_firts_num = true;
-      continue;
-    }
-
-    if (!find_firts_num)
-      machines[i] = line[i];
-    else
-      parts[j++] = line[i];
+  std::string temp;
+  std::istringstream line_(line);
+  std::vector<int> tokens;
+  while (getline(line_, temp, ' ')) {
+    tokens.push_back(atoi(temp.c_str()));
   }
-  this->machines = atoi(machines.c_str());
-  this->parts = atoi(parts.c_str());
+  this->machines = tokens[0];
+  this->parts = tokens[1];
 
   // Create matrix;
   matrix = new bool* [this->machines];
@@ -128,7 +120,7 @@ double VNS::TargetFunction(unsigned* newMachinesSolution,
     }
   }
   
-  return (double)ones_in/(this->all_ones + zeroes_in);
+  return (double)ones_in/((double)this->all_ones + (double)zeroes_in);
 }
 
 void VNS::CreateInitialDecision() {
@@ -152,6 +144,19 @@ void VNS::CreateInitialDecision() {
   
 }
 
+//MoveRows();
+//MoveColumns();
+// MergeClusters();
+// MergeClusters();
+// MergeClusters();
+
+//PrintMachinesSolution();
+//PrintPartsSolution();
+//
+//DivideClusters();
+//  MoveColumns();
+//  MoveRows();
+
 void VNS::VND() {
   unsigned lMax = 2, l = 0;
   double curBestTarget = bestTarget;
@@ -172,7 +177,28 @@ void VNS::VND() {
 }
 
 void VNS::GeneralVNS() {
-
+  unsigned kMax = 2, k = 0;
+  double curBestTarget = bestTarget;
+  while (k != kMax) {
+    std::cout << "Shaking" << std::endl;
+    if (k == 0) {
+      MergeClusters();
+      //DivideClusters();
+    }
+    else if (k == 1) {
+      //MergeClusters();
+      DivideClusters();
+    }
+    VND();
+    PrintMachinesSolution();
+    PrintPartsSolution();
+    std::cout << "Best Target Function: "<< GetBestTarget() << std::endl;
+    if (bestTarget <= curBestTarget)
+      k++;
+    else
+      curBestTarget = bestTarget;
+  }
+  std::cout << "BEST TARGET: " << curBestTarget << std::endl;
 }
 
 // For Search in VND
@@ -236,12 +262,9 @@ void VNS::Permutation(bool isRows){
 
 
 // For shaking in General VNS
-void VNS::DivideClusters(bool findBest){
+void VNS::DivideClusters() {
   if (clustersNum >= std::min(machines, parts))
     return;
-  
-  double bestTargetInSolution = 0;
-  unsigned best_c = 0;
   
   for (unsigned i = 1; i <= clustersNum; i++){
     unsigned* curMachinesSoultion = DivideInTwo(i, machinesSolution, machines);
@@ -250,33 +273,14 @@ void VNS::DivideClusters(bool findBest){
     unsigned* curPartsSoultion = DivideInTwo(i, partsSolution, parts);
     if (curMachinesSoultion == nullptr)
       continue;
-    double target = TargetFunction(curMachinesSoultion, curPartsSoultion);
     
-    // check changes
-    if (target > bestTargetInSolution || !findBest){
-      bestTargetInSolution = target;
-      best_c = i;
-    }
-
-    delete [] curMachinesSoultion;
-    delete [] curPartsSoultion;
-    
-    if (!findBest)
-      break;
-  }
-
-  // implement changes
-  if (best_c){
-    unsigned* newMachinesSoultion = DivideInTwo(best_c, machinesSolution, machines);
-    unsigned* newPartsSoultion = DivideInTwo(best_c, partsSolution, parts);
     delete [] machinesSolution;
     delete [] partsSolution;
-    machinesSolution = newMachinesSoultion;
-    partsSolution = newPartsSoultion;
-    
-    bestTarget = bestTargetInSolution;
-    clustersNum++;
+    machinesSolution = curMachinesSoultion;
+    partsSolution = curPartsSoultion;
+    bestTarget = TargetFunction();
   }
+
 }
 
 unsigned* VNS::DivideInTwo(unsigned& c, unsigned* targetVectorSolution, unsigned& size, float percent){
@@ -314,7 +318,7 @@ void VNS::MergeClusters(bool findBest) {
   unsigned best_c1 = 0;
   unsigned best_c2 = 0;
   
-  if (findBest){
+//  if (findBest){
     for (unsigned i = 1; i <= clustersNum; i++){
       for (unsigned j = i + 1; j <= clustersNum; j++){
         // (i , j) - clussters to be merged
@@ -331,29 +335,17 @@ void VNS::MergeClusters(bool findBest) {
         delete [] curPartsSoultion;
       }
     }
-  } else {
-    srand (std::time(NULL));
-    unsigned* clustersArray = new unsigned[clustersNum];
-    for (int i = 0; i < clustersNum; i++)
-      clustersArray[i] = i + 1;
-    std::random_shuffle<unsigned int *>
-    (&clustersArray[0], &clustersArray[clustersNum]);
-    
-    best_c1 = clustersArray[0];
-    best_c2 = clustersArray[1];
-  }
+//  } else {
+//    srand (std::time(NULL));
+//    best_c1 = std::rand() %
+//  }
   
   
   // implement changes
   if (best_c1 && best_c2){
-    unsigned* newMachinesSolution = MergeTwo(best_c1, best_c2, machinesSolution, machines);
-    unsigned* newPartsSolution = MergeTwo(best_c1, best_c2, partsSolution, parts);
-    delete [] machinesSolution;
-    delete [] partsSolution;
-    machinesSolution = newMachinesSolution;
-    partsSolution = newPartsSolution;
-    
-    bestTarget = TargetFunction();
+    machinesSolution = MergeTwo(best_c1, best_c2, machinesSolution, machines);
+    partsSolution = MergeTwo(best_c1, best_c2, partsSolution, parts);
+    bestTarget = bestTargetInSolution;
     clustersNum--;
   }
 }
