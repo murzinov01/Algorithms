@@ -266,7 +266,7 @@ void VNS::DivideClusters(bool findBest){
     if (curMachinesSoultion == nullptr)
       continue;
     unsigned* curPartsSoultion = DivideInTwo(i, partsSolution, parts);
-    if (curMachinesSoultion == nullptr)
+    if (curPartsSoultion == nullptr)
       continue;
     double target = TargetFunction(curMachinesSoultion, curPartsSoultion);
     
@@ -380,13 +380,19 @@ unsigned* VNS::MergeTwo(unsigned& c1, unsigned& c2,
                         unsigned* targetVectorSolution, unsigned& size){
   unsigned* curSolution = new unsigned[size];
   
+  if (c1 > c2){
+    unsigned tmp = c2;
+    c2 = c1;
+    c1 = tmp;
+  }
+  
   for (unsigned m = 0; m < size; m++){
-  if (targetVectorSolution[m] == c2)
-    curSolution[m] = c1;
-  else if (targetVectorSolution[m] > c1)
-    curSolution[m] = targetVectorSolution[m] - 1;
-  else
-    curSolution[m] = targetVectorSolution[m];
+    if (targetVectorSolution[m] == c2)
+      curSolution[m] = c1;
+    else if (targetVectorSolution[m] > c2)
+      curSolution[m] = targetVectorSolution[m] - 1;
+    else
+      curSolution[m] = targetVectorSolution[m];
   }
   
   return curSolution;
