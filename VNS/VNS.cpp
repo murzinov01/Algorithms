@@ -42,16 +42,16 @@ void VNS::PrintMatrix() {
   }
 }
 void VNS::PrintMachinesSolution() {
-  std::cout << "(";
+  std::cout << "Machines: (";
   for (unsigned i = 0; i < machines; i++)
     std::cout << machinesSolution[i] << " ";
-  std::cout << ")";
+  std::cout << ")" << std::endl;
 }
 void VNS::PrintPartsSolution() {
-  std::cout << "(";
+  std::cout << "Parts: (";
   for (unsigned i = 0; i < parts; i++)
     std::cout << partsSolution[i] << " ";
-  std::cout << ")";
+  std::cout << ")" << std::endl;
 }
 
 
@@ -120,7 +120,7 @@ double VNS::TargetFunction(unsigned* newMachinesSolution,
     }
   }
   
-  return (double)ones_in/((double)this->all_ones + (double)zeroes_in);
+  return (double)ones_in/(this->all_ones + zeroes_in);
 }
 
 void VNS::CreateInitialDecision() {
@@ -144,19 +144,6 @@ void VNS::CreateInitialDecision() {
   
 }
 
-//MoveRows();
-//MoveColumns();
-// MergeClusters();
-// MergeClusters();
-// MergeClusters();
-
-//PrintMachinesSolution();
-//PrintPartsSolution();
-//
-//DivideClusters();
-//  MoveColumns();
-//  MoveRows();
-
 void VNS::VND() {
   unsigned lMax = 2, l = 0;
   double curBestTarget = bestTarget;
@@ -167,7 +154,7 @@ void VNS::VND() {
     }
     else if (l == 1) {
       MoveRows();
-      //MoveColumns();
+      // MoveColumns();
     }
     if (bestTarget <= curBestTarget)
       l++;
@@ -182,7 +169,12 @@ void VNS::GeneralVNS() {
   while (k != kMax) {
     std::cout << "Shaking" << std::endl;
     if (k == 0) {
+      std::cout << "BEFORE MERGE" << std::endl;
+      PrintMachinesSolution();
+      //std::cout << "MERGE" << std::endl;
       MergeClusters();
+      std::cout << "AFTER MERGE" << std::endl;
+      PrintMachinesSolution();
       //DivideClusters();
     }
     else if (k == 1) {
@@ -262,9 +254,12 @@ void VNS::Permutation(bool isRows){
 
 
 // For shaking in General VNS
-void VNS::DivideClusters() {
+void VNS::DivideClusters(bool findBest){
   if (clustersNum >= std::min(machines, parts))
     return;
+  
+  double bestTargetInSolution = 0;
+  unsigned best_c = 0;
   
   for (unsigned i = 1; i <= clustersNum; i++){
     unsigned* curMachinesSoultion = DivideInTwo(i, machinesSolution, machines);
@@ -273,14 +268,33 @@ void VNS::DivideClusters() {
     unsigned* curPartsSoultion = DivideInTwo(i, partsSolution, parts);
     if (curMachinesSoultion == nullptr)
       continue;
+    double target = TargetFunction(curMachinesSoultion, curPartsSoultion);
     
-    delete [] machinesSolution;
-    delete [] partsSolution;
-    machinesSolution = curMachinesSoultion;
-    partsSolution = curPartsSoultion;
-    bestTarget = TargetFunction();
+    // check changes
+    if (target > bestTargetInSolution || !findBest){
+      bestTargetInSolution = target;
+      best_c = i;
+    }
+
+    delete [] curMachinesSoultion;
+    delete [] curPartsSoultion;
+    
+    if (!findBest)
+      break;
   }
 
+  // implement changes
+  if (best_c){
+    unsigned* newMachinesSoultion = DivideInTwo(best_c, machinesSolution, machines);
+    unsigned* newPartsSoultion = DivideInTwo(best_c, partsSolution, parts);
+    delete [] machinesSolution;
+    delete [] partsSolution;
+    machinesSolution = newMachinesSoultion;
+    partsSolution = newPartsSoultion;
+    
+    bestTarget = bestTargetInSolution;
+    clustersNum++;
+  }
 }
 
 unsigned* VNS::DivideInTwo(unsigned& c, unsigned* targetVectorSolution, unsigned& size, float percent){
@@ -318,7 +332,7 @@ void VNS::MergeClusters(bool findBest) {
   unsigned best_c1 = 0;
   unsigned best_c2 = 0;
   
-//  if (findBest){
+  if (findBest){
     for (unsigned i = 1; i <= clustersNum; i++){
       for (unsigned j = i + 1; j <= clustersNum; j++){
         // (i , j) - clussters to be merged
@@ -335,17 +349,29 @@ void VNS::MergeClusters(bool findBest) {
         delete [] curPartsSoultion;
       }
     }
-//  } else {
-//    srand (std::time(NULL));
-//    best_c1 = std::rand() %
-//  }
+  } else {
+    srand (time(NULL));
+    unsigned* clustersArray = new unsigned[clustersNum];
+    for (int i = 0; i < clustersNum; i++)
+      clustersArray[i] = i + 1;
+    std::random_shuffle<unsigned int *>
+    (&clustersArray[0], &clustersArray[clustersNum]);
+    
+    best_c1 = clustersArray[0];
+    best_c2 = clustersArray[1];
+  }
   
   
   // implement changes
   if (best_c1 && best_c2){
-    machinesSolution = MergeTwo(best_c1, best_c2, machinesSolution, machines);
-    partsSolution = MergeTwo(best_c1, best_c2, partsSolution, parts);
-    bestTarget = bestTargetInSolution;
+    unsigned* newMachinesSolution = MergeTwo(best_c1, best_c2, machinesSolution, machines);
+    unsigned* newPartsSolution = MergeTwo(best_c1, best_c2, partsSolution, parts);
+    delete [] machinesSolution;
+    delete [] partsSolution;
+    machinesSolution = newMachinesSolution;
+    partsSolution = newPartsSolution;
+    
+    bestTarget = TargetFunction();
     clustersNum--;
   }
 }
