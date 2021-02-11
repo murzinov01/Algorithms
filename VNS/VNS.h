@@ -40,7 +40,7 @@ private:
 
 public:
   VNS();
-  VNS(std::string file_name);
+  VNS(std::string file_name, bool findGreedy = false);
 
   unsigned GetMachinesNumber() const;
   unsigned GetPartsNumber() const;
