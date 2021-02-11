@@ -10,6 +10,11 @@
 #include <time.h>
 #include <algorithm>
 
+struct RowsPair {
+  unsigned i, j;
+  float score;
+};
+
 class VNS {
 private:
   bool** matrix;
@@ -35,7 +40,7 @@ private:
 
 public:
   VNS();
-  VNS(std::string file_name);
+  VNS(std::string file_name, bool findGreedy = false);
 
   unsigned GetMachinesNumber() const;
   unsigned GetPartsNumber() const;
@@ -45,11 +50,12 @@ public:
   double GetBestTarget() const { return bestTarget; }
 
   void PrintMatrix();
-  void PrintMachinesSolution();
-  void PrintPartsSolution();
+  void PrintMachinesSolution(unsigned* targetSoultion = nullptr);
+  void PrintPartsSolution(unsigned* targetSoultion = nullptr);
 
   void ReadData(std::string file_name);
   void CreateInitialDecision();
+  void CreateCleverInitialDecision(unsigned& targetClustersNum);
   void VND();
   void GeneralVNS();
 };
