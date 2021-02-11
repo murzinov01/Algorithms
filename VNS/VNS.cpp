@@ -1,7 +1,6 @@
 // Copyright 2020 GHA Test Team
 #include "VNS.h"
 
-
 VNS::VNS() {
   matrix = nullptr;
   machinesSolution = partsSolution = nullptr;
@@ -9,10 +8,10 @@ VNS::VNS() {
 }
 VNS::VNS(std::string file_name) {
   ReadData(file_name);
-  CreateInitialDecision();
-//  this->neighbours.push_back(&this->MoveColumns());
+//  CreateInitialDecision();
+  unsigned targetClustersNum = std::min(machines, parts);
+  CreateCleverInitialDecision(targetClustersNum);
 }
-
 
 unsigned VNS::GetMachinesNumber() const {
   return machines;
@@ -30,7 +29,6 @@ bool** VNS::GetMatrix() const {
   return matrix;
 }
 
-
 void VNS::PrintMatrix() {
   std::cout << "Shape: " << machines << "x" << parts
     << "\nAll ones: " << all_ones << std::endl;
@@ -41,17 +39,28 @@ void VNS::PrintMatrix() {
     std::cout << std::endl;
   }
 }
-void VNS::PrintMachinesSolution() {
+
+void VNS::PrintMachinesSolution(unsigned* targetSoultion) {
   std::cout << "Machines: (";
-  for (unsigned i = 0; i < machines; i++)
-    std::cout << machinesSolution[i] << " ";
-  std::cout << ")" << std::endl;
+  for (unsigned i = 0; i < machines; i++){
+    if (targetSoultion == nullptr)
+      std::cout << machinesSolution[i] << " ";
+    else
+      std::cout << targetSoultion[i] << " ";
+  }
+
+  std::cout << "); ClustersNum: " << clustersNum << std::endl;
 }
-void VNS::PrintPartsSolution() {
+
+void VNS::PrintPartsSolution(unsigned* targetSoultion) {
   std::cout << "Parts: (";
-  for (unsigned i = 0; i < parts; i++)
-    std::cout << partsSolution[i] << " ";
-  std::cout << ")" << std::endl;
+  for (unsigned i = 0; i < parts; i++){
+    if (targetSoultion == nullptr)
+      std::cout << partsSolution[i] << " ";
+    else
+      std::cout << targetSoultion[i] << " ";
+  }
+  std::cout << "); ClustersNum: " << clustersNum << std::endl;
 }
 
 
@@ -144,17 +153,155 @@ void VNS::CreateInitialDecision() {
   
 }
 
+void VNS::CreateCleverInitialDecision(unsigned& targetClustersNum) {
+  unsigned localTarget = targetClustersNum;
+  if (targetClustersNum > std::min(machines, parts)){
+    std::cout<< "ERROR: too big 'targetCLustersNum' ("
+    << targetClustersNum << ")" << std::endl;
+    localTarget = std::min(machines, parts);
+  } else {
+    localTarget = targetClustersNum;
+  }
+  
+  // *Define compatibility of rows*
+  float** compatibilityMatrix = new float* [machines];
+  for (unsigned i = 0; i < machines; i++)
+    compatibilityMatrix[i] = new float[machines] { 0.0 };
+  std::vector<RowsPair> pairs;
+  
+  for (unsigned i = 0; i < machines; i++){
+    compatibilityMatrix[i][i] = -1;
+    for (unsigned j = i + 1; j < machines; j ++){
+      // we have chosen two raws to compare - raw i and j
+      unsigned oneScore = 0;
+      unsigned zeroScore = 0;
+      for (unsigned n = 0; n < parts; n++){
+        if (matrix[i][n] && matrix[j][n])
+          oneScore++;
+        if (!matrix[i][n] && !matrix[j][n])
+          zeroScore++;
+      }
+      float score = (float)oneScore / parts;
+      compatibilityMatrix[i][j] = score;
+      compatibilityMatrix[j][i] = score;
+      
+//      float score = oneScore + zeroScore / (parts * 2);
+      RowsPair curPair;
+      curPair.i = i;
+      curPair.j = j;
+      curPair.score = score;
+      
+      // insert pair with sorting
+      if (!pairs.size()) {
+        pairs.push_back(curPair);
+        continue;
+      }
+
+      int position = -1;
+      for (unsigned n = 0; n < pairs.size(); n++){
+        if (score >= pairs[n].score){
+          continue;
+        }
+        position = n;
+        break;
+      }
+      if (position == -1)
+        position = pairs.size();
+      pairs.insert(pairs.begin() + position, curPair);
+      
+    }
+  }
+  
+  unsigned* curMachinesSolution = new unsigned[machines] { 0 };
+  unsigned curClustersNum = 0;
+  unsigned pairsIter = 0;
+  PrintMachinesSolution(curMachinesSolution);
+  // *Create maximum of clusters using greedy*
+  while (curClustersNum < localTarget && pairsIter < pairs.size()){ //!
+    RowsPair curPair = pairs[pairs.size() - pairsIter - 1];
+    if (!curMachinesSolution[curPair.i] && !curMachinesSolution[curPair.j]){
+      curMachinesSolution[curPair.i] = curClustersNum + 1;
+      curMachinesSolution[curPair.j] = curClustersNum + 1;
+      PrintMachinesSolution(curMachinesSolution); 
+      curClustersNum++;
+    }
+    pairsIter++;
+  }
+  
+  // *Distribute other free machines*
+  for (int i = 0; i < machines; i++){
+    if (curMachinesSolution[i])
+      continue;
+    float* applicantClusters = new float[localTarget] { 0.0 };
+    // calculate compatibility with each cluster
+    for (int j = 0; j < machines; j++){
+      applicantClusters[curMachinesSolution[j] - 1] += compatibilityMatrix[i][j];
+    }
+    unsigned best_c = 0;
+    float bestCompatibility = 0.0;
+    for (unsigned j = 0; j < localTarget; j++){
+      if (applicantClusters[j] >= bestCompatibility){
+        bestCompatibility = applicantClusters[j];
+        best_c = j + 1;
+      }
+    }
+    // add to best cluster
+    curMachinesSolution[i] = best_c;
+    delete [] applicantClusters;
+  }
+  
+  // *Distribute parts to the clusters
+  unsigned* curPartsSolution = new unsigned[parts] { 0 };
+  
+  for (unsigned i = 0; i < parts; i++){
+    // every part
+    // choose best cluster
+    unsigned* applicantClusters = new unsigned[localTarget] { 0 };
+    for (unsigned j = 0; j < machines; j++){
+      // every machnine
+      if (!matrix[j][i])
+        continue;
+      unsigned clusterName = curMachinesSolution[j];
+      applicantClusters[clusterName - 1]++;
+    }
+    
+    unsigned best_c = 0;
+    float bestCompatibility = 0;
+    for (unsigned j = 0; j < localTarget; j++){
+      if (applicantClusters[j] >= bestCompatibility){
+        bestCompatibility = applicantClusters[j];
+        best_c = j + 1;
+      }
+    }
+    // add to best cluster
+    curPartsSolution[i] = best_c;
+    delete [] applicantClusters;
+  }
+  
+  // *Free memory*
+  for (int i = 0; i < machines; i++)
+    delete [] compatibilityMatrix[i];
+  delete [] compatibilityMatrix;
+  
+  clustersNum = curClustersNum;
+  delete [] machinesSolution;
+  delete [] partsSolution;
+  machinesSolution = curMachinesSolution;
+  partsSolution = curPartsSolution;
+  bestTarget = TargetFunction();
+}
+
 void VNS::VND() {
   unsigned lMax = 2, l = 0;
   double curBestTarget = bestTarget;
   while (l != lMax) {
     if (l == 0) {
-      //MoveRows();
+//      MoveRows();
       MoveColumns();
     }
     else if (l == 1) {
       MoveRows();
-      // MoveColumns();
+//       MoveColumns();
     }
     if (bestTarget <= curBestTarget)
       l++;
@@ -175,6 +322,7 @@ void VNS::GeneralVNS() {
       MergeClusters();
       std::cout << "AFTER MERGE" << std::endl;
       PrintMachinesSolution();
+      std::cout << "Best Target Function: "<< GetBestTarget() << std::endl;
       //DivideClusters();
     }
     else if (k == 1) {
@@ -260,6 +408,7 @@ void VNS::DivideClusters(bool findBest){
   
   double bestTargetInSolution = 0;
   unsigned best_c = 0;
+  std::vector<unsigned> allValidClusters;
   
   for (unsigned i = 1; i <= clustersNum; i++){
     unsigned* curMachinesSoultion = DivideInTwo(i, machinesSolution, machines);
@@ -269,20 +418,22 @@ void VNS::DivideClusters(bool findBest){
     if (curPartsSoultion == nullptr)
       continue;
     double target = TargetFunction(curMachinesSoultion, curPartsSoultion);
-    
+    allValidClusters.push_back(i);
     // check changes
-    if (target > bestTargetInSolution || !findBest){
+    if (target > bestTargetInSolution){
       bestTargetInSolution = target;
       best_c = i;
     }
-
     delete [] curMachinesSoultion;
     delete [] curPartsSoultion;
-    
-    if (!findBest)
-      break;
   }
-
+  
+  if (!findBest && allValidClusters.size() != 0){
+    srand (time(NULL));
+    unsigned random = rand() % allValidClusters.size();
+    best_c = allValidClusters[random];
+  }
+  
   // implement changes
   if (best_c){
     unsigned* newMachinesSoultion = DivideInTwo(best_c, machinesSolution, machines);
