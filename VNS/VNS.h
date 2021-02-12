@@ -10,6 +10,12 @@
 #include <time.h>
 #include <algorithm>
 
+struct RNG {
+  int operator() (int n) {
+    return std::rand() / (1.0 + RAND_MAX) * n;
+  }
+};
+
 struct RowsPair {
   unsigned i, j;
   float score;
@@ -37,6 +43,7 @@ private:
   unsigned* MergeTwo(unsigned& c1, unsigned& c2,
                      unsigned* targetVectorSolution, unsigned& size);
   std::vector <void(*)()> neighbours;
+  void GetShakingNeighbours(bool, int, int);
 
 public:
   VNS();
@@ -57,7 +64,8 @@ public:
   void CreateInitialDecision();
   void CreateCleverInitialDecision(unsigned& targetClustersNum);
   void VND();
-  void GeneralVNS();
+  void GeneralVNS(std::string resultFileName);
+  void SaveData(std::string file_name);
 };
 
 #endif  // INCLUDE_VNS_H_

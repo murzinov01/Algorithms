@@ -1,6 +1,7 @@
 // Copyright 2020 GHA Test Team
 #include "VNS.h"
 
+
 VNS::VNS() {
   matrix = nullptr;
   machinesSolution = partsSolution = nullptr;
@@ -14,8 +15,6 @@ VNS::VNS(std::string file_name, bool findGreedy) {
   } else {
     CreateInitialDecision();
   }
-
-
 }
 
 unsigned VNS::GetMachinesNumber() const {
@@ -44,7 +43,6 @@ void VNS::PrintMatrix() {
     std::cout << std::endl;
   }
 }
-
 void VNS::PrintMachinesSolution(unsigned* targetSoultion) {
   std::cout << "Machines: (";
   for (unsigned i = 0; i < machines; i++){
@@ -56,7 +54,6 @@ void VNS::PrintMachinesSolution(unsigned* targetSoultion) {
 
   std::cout << "); ClustersNum: " << clustersNum << std::endl;
 }
-
 void VNS::PrintPartsSolution(unsigned* targetSoultion) {
   std::cout << "Parts: (";
   for (unsigned i = 0; i < parts; i++){
@@ -211,22 +208,21 @@ void VNS::CreateCleverInitialDecision(unsigned& targetClustersNum) {
       }
       if (position == -1)
         position = pairs.size();
-      pairs.insert(pairs.begin() + position, curPair);
-      
+      pairs.insert(pairs.begin() + position, curPair); 
     }
   }
   
   unsigned* curMachinesSolution = new unsigned[machines] { 0 };
   unsigned curClustersNum = 0;
   unsigned pairsIter = 0;
-  PrintMachinesSolution(curMachinesSolution);
+  //PrintMachinesSolution(curMachinesSolution);
   // *Create maximum of clusters using greedy*
   while (curClustersNum < localTarget && pairsIter < pairs.size()){ //!
     RowsPair curPair = pairs[pairs.size() - pairsIter - 1];
     if (!curMachinesSolution[curPair.i] && !curMachinesSolution[curPair.j]){
       curMachinesSolution[curPair.i] = curClustersNum + 1;
       curMachinesSolution[curPair.j] = curClustersNum + 1;
-      PrintMachinesSolution(curMachinesSolution); 
+      //PrintMachinesSolution(curMachinesSolution); 
       curClustersNum++;
     }
     pairsIter++;
@@ -302,16 +298,16 @@ void VNS::VND() {
   double curBestTarget = bestTarget;
   while (l != lMax) {
     if (l == 0) {
-//      MoveRows();
-      MoveColumns();
+      MoveRows();
+      //MoveColumns();
       if (bestTarget <= curBestTarget)
         l++;
       else
         curBestTarget = bestTarget;
     }
     else if (l == 1) {
-      MoveRows();
-      //MoveColumns();
+      //MoveRows();
+      MoveColumns();
       if (bestTarget <= curBestTarget)
         l++;
       else {
@@ -325,131 +321,138 @@ void VNS::VND() {
 int compare(const void* x1, const void* x2) {
   return (int)(*(double*)x1 - *(double*)x2);       
 }
-template<typename T>
+template<typename T> 
 void copyArray(T* arrayTo, T* arrayFrom, unsigned size) {
   for (int i = 0; i < size; i++)
     arrayTo[i] = arrayFrom[i];
 }
 
-void VNS::GeneralVNS() {
+void VNS::GetShakingNeighbours(bool merge, int numberOfShakes, int topN) {
+  unsigned** machinesSolutions = new unsigned* [numberOfShakes];
+  unsigned** partsSolutions = new unsigned* [numberOfShakes];
+  for (int i = 0; i < numberOfShakes; i++) {
+    machinesSolutions[i] = new unsigned[machines];
+    partsSolutions[i] = new unsigned[parts];
+  }
+  double* costs = new double[numberOfShakes] { 0.0 };
+  double* sorted_costs = new double[numberOfShakes] { 0.0 };
+  unsigned** machinesSolutionsAfterVnd = new unsigned* [topN];
+  unsigned** partsSolutionsAfterVnd = new unsigned* [topN];
+  for (int i = 0; i < topN; i++) {
+    machinesSolutionsAfterVnd[i] = new unsigned[machines];
+    partsSolutionsAfterVnd[i] = new unsigned[parts];
+  }
+  double* costsAfterVnd = new double[topN] { 0.0 };
+  unsigned* curMachinesSolution = new unsigned[machines];
+  unsigned* curpartsSolution = new unsigned[parts];
+  int curClustersNum = this->clustersNum;
+
+  copyArray(curMachinesSolution, this->machinesSolution, machines);
+  copyArray(curpartsSolution, this->partsSolution, parts);
+  for (int i = 0; i < numberOfShakes; i++) {
+    //std::cout << "Shake number " << i << std::endl;
+    this->clustersNum = curClustersNum;
+    copyArray(this->machinesSolution, curMachinesSolution, machines);
+    copyArray(this->partsSolution, curpartsSolution, parts);
+    if (merge)
+      MergeClusters();
+    else
+      DivideClusters();
+    copyArray(machinesSolutions[i], this->machinesSolution, machines);
+    copyArray(partsSolutions[i], this->partsSolution, parts);
+    costs[i] = this->bestTarget;
+    sorted_costs[i] = this->bestTarget;
+  }
+  this->clustersNum--;
+  qsort(sorted_costs, numberOfShakes, sizeof(double), compare);
+
+  for (int i = numberOfShakes - 1; i >= numberOfShakes - topN; i--) {
+    for (int j = 0; j < numberOfShakes; j++) {
+      if (costs[j] == sorted_costs[i]) {
+        copyArray(this->machinesSolution, machinesSolutions[j], machines);
+        copyArray(this->partsSolution, partsSolutions[j], parts);
+        this->bestTarget = costs[j];
+        std::cout << "VND number " << numberOfShakes - 1 - i << std::endl;
+        VND();
+        copyArray(machinesSolutionsAfterVnd[numberOfShakes - 1 - i], this->machinesSolution, machines);
+        copyArray(partsSolutionsAfterVnd[numberOfShakes - 1 - i], this->partsSolution, parts);
+        costsAfterVnd[numberOfShakes - 1 - i] = this->bestTarget;
+        break;
+      }
+    }
+  }
+  double best_cost = 0.0;
+  int best_i = 0;
+  for (int i = 0; i < topN; i++) {
+    if (best_cost < costsAfterVnd[i]) {
+      best_cost = costsAfterVnd[i];
+      best_i = i;
+    }
+  }
+  copyArray(this->machinesSolution, machinesSolutionsAfterVnd[best_i], machines);
+  copyArray(this->partsSolution, partsSolutionsAfterVnd[best_i], parts);
+  this->bestTarget = best_cost;
+
+  // Delete data
+  for (int i = 0; i < numberOfShakes; i++) {
+    delete[] machinesSolutions[i];
+    delete[] partsSolutions[i];;
+  }
+  for (int i = 0; i < topN; i++) {
+    delete machinesSolutionsAfterVnd[i];
+    delete partsSolutionsAfterVnd[i];
+  }
+  delete[] machinesSolutions;
+  delete[] partsSolutions;
+  delete[] machinesSolutionsAfterVnd;
+  delete[] partsSolutionsAfterVnd;
+}
+
+void VNS::GeneralVNS(std::string resultFileName) {
   unsigned kMax = 2, k = 0;
   double curBestTarget = bestTarget;
   int numberOfShakes = 50;
   int topN = 10;
-  VND();
-  std::cout << "Result: " << curBestTarget << std::endl;
+  unsigned* bestMachinesSolution = new unsigned[machines] {0};
+  unsigned* bestPartsSolution = new unsigned[parts] {0};
+  // VND();
+  //std::cout << "Result: " << curBestTarget << std::endl;
   while (k != kMax) {
     if (k == 0) {
-      //MergeClusters(true);
-      // Initialization
-      unsigned** machinesSolutions = new unsigned* [numberOfShakes];
-      unsigned** partsSolutions = new unsigned* [numberOfShakes];
-      for (int i = 0; i < numberOfShakes; i++) {
-        machinesSolutions[i] = new unsigned[machines];
-        partsSolutions[i] = new unsigned[parts];
-      }
-      double* costs = new double[numberOfShakes] { 0.0 };
-      double* sorted_costs = new double[numberOfShakes] { 0.0 };
-      unsigned** machinesSolutionsAfterVnd = new unsigned* [topN];
-      unsigned** partsSolutionsAfterVnd = new unsigned* [topN];
-      for (int i = 0; i < topN; i++) {
-        machinesSolutionsAfterVnd[i] = new unsigned[machines];
-        partsSolutionsAfterVnd[i] = new unsigned[parts];
-      }
-      double* costsAfterVnd = new double[topN] { 0.0 };
-      unsigned* curMachinesSolution = new unsigned[machines];
-      unsigned* curpartsSolution = new unsigned[parts];
-      int curClustersNum = this->clustersNum;
-
-      copyArray(curMachinesSolution, this->machinesSolution, machines);
-      copyArray(curpartsSolution, this->partsSolution, parts);
-      for (int i = 0; i < numberOfShakes; i++) {
-        std::cout << "Shake number " << i << std::endl;
-        this->clustersNum = curClustersNum;
-        copyArray(this->machinesSolution, curMachinesSolution, machines);
-        copyArray(this->partsSolution, curpartsSolution, parts);
-        MergeClusters();
-        copyArray(machinesSolutions[i], this->machinesSolution, machines);
-        copyArray(partsSolutions[i], this->partsSolution, parts);
-        costs[i] = this->bestTarget;
-        sorted_costs[i] = this->bestTarget;
-      }
-      this->clustersNum--;
-      qsort(sorted_costs, numberOfShakes, sizeof(double), compare);
-
-      //for (int i = 0; i < numberOfShakes; i++) {
-      //  std::cout << sorted_costs[i] << " ";
-      //}
-      //std::cout << std::endl;
-      //std::cout << sorted_costs[0] << " VS " << sorted_costs[49] << std::endl;
-
-      for (int i = numberOfShakes - 1; i >= numberOfShakes - topN; i--) {
-        for (int j = 0; j < numberOfShakes; j++) {
-          if (costs[j] == sorted_costs[i]) {
-            copyArray(this->machinesSolution, machinesSolutions[j], machines);
-            copyArray(this->partsSolution, partsSolutions[j], parts);
-            this->bestTarget = costs[j];
-            std::cout << "VND number " << numberOfShakes - 1 - i << std::endl;
-            VND();
-            copyArray(machinesSolutionsAfterVnd[numberOfShakes - 1 - i], this->machinesSolution, machines);
-            copyArray(partsSolutionsAfterVnd[numberOfShakes - 1 - i], this->partsSolution, parts);
-            costsAfterVnd[numberOfShakes - 1 - i] = this->bestTarget;
-            break;
-          }
-        }
-      }
-      //std::cout << "HELLO1" << std::endl;
-      double best_cost = 0.0;
-      int best_i = 0;
-      for (int i = 0; i < topN; i++) {
-        if (best_cost < costsAfterVnd[i]) {
-          best_cost = costsAfterVnd[i];
-          best_i = i;
-        }
-      }
-      copyArray(this->machinesSolution, machinesSolutionsAfterVnd[best_i], machines);
-      copyArray(this->partsSolution, partsSolutionsAfterVnd[best_i], parts);
-      this->bestTarget = best_cost;
-
-      // std::cout << "HELLO2" << std::endl;
-      // Delete data
-      for (int i = 0; i < numberOfShakes; i++) {
-        delete[] machinesSolutions[i];
-        delete[] partsSolutions[i];;
-      }
-      for (int i = 0; i < topN; i++) {
-        delete machinesSolutionsAfterVnd[i];
-        delete partsSolutionsAfterVnd[i];
-      }
-      delete[] machinesSolutions;
-      delete[] partsSolutions;
-      delete[] machinesSolutionsAfterVnd;
-      delete[] partsSolutionsAfterVnd;
-
-      std::cout << "Result: " << curBestTarget << " K: " << k << std::endl;
-
+      //GetShakingNeighbours(true, 100, 15);
+      MergeClusters(true);
       if (bestTarget <= curBestTarget) {
         k++;
         continue;
       }
-      else
+      else {
+        copyArray(bestMachinesSolution, this->machinesSolution, machines);
+        copyArray(bestPartsSolution, this->partsSolution, parts);
         curBestTarget = bestTarget;
+      }
     }
-    else if (k == 1) {
+   else if (k == 1) {
+      //GetShakingNeighbours(false, 100, 15);
       DivideClusters(true);
-      VND();
       if (bestTarget <= curBestTarget) {
         k++;
         continue;
       }
       else {
         curBestTarget = bestTarget;
+        copyArray(bestMachinesSolution, this->machinesSolution, machines);
+        copyArray(bestPartsSolution, this->partsSolution, parts);
         k = 0;
       }
     }
+    VND();
     std::cout << "Result: " << curBestTarget  << " K: " << k << std::endl;
   }
   std::cout << "BEST TARGET: " << curBestTarget << std::endl;
+  copyArray(this->machinesSolution, bestMachinesSolution, machines);
+  copyArray(this->partsSolution, bestPartsSolution, parts);
+  bestTarget = curBestTarget;
+  SaveData(resultFileName);
 }
 
 // For Search in VND
@@ -510,8 +513,6 @@ void VNS::Permutation(bool isRows){
   }
   
 }
-
-
 // For shaking in General VNS
 void VNS::DivideClusters(bool findBest){
   if (clustersNum >= std::min(machines, parts))
@@ -662,4 +663,20 @@ unsigned* VNS::MergeTwo(unsigned& c1, unsigned& c2,
   }
   
   return curSolution;
+}
+
+void VNS::SaveData(std::string file_name) {
+  std::ofstream out;
+  out.open(file_name);
+
+  if (out.is_open())
+  {
+    for (long i = 0; i < machines; i++)
+      out << machinesSolution[i] << " ";
+    out << std::endl;
+    for (long i = 0; i < parts; i++)
+      out << partsSolution[i] << " ";
+    out << std::endl;
+    out << bestTarget << std::endl;
+  }
 }
