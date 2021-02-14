@@ -65,6 +65,7 @@ public:
   void CreateCleverInitialDecision(unsigned& targetClustersNum);
   void VND();
   void GeneralVNS(std::string resultFileName);
+  void SmartGVNS(std::string resultFileName);
   void SaveData(std::string file_name);
 };
 
