@@ -5,6 +5,16 @@ import matplotlib.pyplot as plt
 
 def read_tsp(filename: str, dimensions=2, delimiter=' ',
              top_banner=0, return_top_info=False):
+    """
+    Read tsp dataset
+    :param filename: name of file with dataset
+    :param dimensions: how many dimensions a vertex has
+    :param delimiter: delimiter in rows
+    :param top_banner: number of strings which do not represent vertex positions
+    :param return_top_info: should the function return info from the top of file
+    :return: return_top_info == False: vertexes {id: (pos_1, ... pos_n)}
+             return_top_info == True: top_info (list of lines), vertexes {id: (pos_1, ... pos_n)}
+    """
     with open(filename, 'r') as f:
         # read tsp info
         top_info = list()
@@ -24,6 +34,13 @@ def read_tsp(filename: str, dimensions=2, delimiter=' ',
 
 
 def save_answer_csv(path: list, filename='tsp_answer_path.csv', headers=[]):
+    """
+    Create (if needed) the csv file with tsp answer
+    :param path: Hamiltonian way in list
+    :param filename: name of csv file to write the answer
+    :param headers: headers of csv file
+    :return: None
+    """
     if headers is None:
         headers = []
     with open(filename, 'w') as f:
@@ -56,6 +73,17 @@ def __create_edges_from_path(path: list):
 
 def visualize_tsp(vertexes: dict, path: list, filename='tsp_answer_path.jpg',
                   dpi=500, node_size=1.0, font_size=1.0, with_labels=False):
+    """
+    Draw graph of tsp answer and save it as JPG
+    :param vertexes: vertexes dict (get it from read_tsp() function)
+    :param path: Hamiltonian way in list
+    :param filename: name of picture
+    :param dpi: picture resolution
+    :param node_size: size of vertex in picture
+    :param font_size: size of font in picture
+    :param with_labels: are there id of every vertex in picture
+    :return: None
+    """
     edges = __create_edges_from_path(path)
     graph = nx.Graph()
     # add vertexes
