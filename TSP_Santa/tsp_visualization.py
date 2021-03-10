@@ -25,7 +25,7 @@ def read_tsp(filename: str, dimensions=2, delimiter=' ',
         vertexes = dict()
         for line in f:
             line = line.split(delimiter)[:dimensions+1]
-            vertexes[line[0]] = tuple([float(line[i+1]) for i in range(dimensions)])
+            vertexes[int(line[0])] = tuple([float(line[i+1]) for i in range(dimensions)])
 
     if return_top_info:
         return top_info, vertexes
@@ -33,7 +33,7 @@ def read_tsp(filename: str, dimensions=2, delimiter=' ',
         return vertexes
 
 
-def save_answer_csv(path: list, filename='tsp_answer_path.csv', headers=[]):
+def save_answer_csv(path: list, filename='tsp_answer_path.csv', headers=tuple()):
     """
     Create (if needed) the csv file with tsp answer
     :param path: Hamiltonian way in list
@@ -51,14 +51,14 @@ def save_answer_csv(path: list, filename='tsp_answer_path.csv', headers=[]):
             writer.writerow([vertex])
 
 
-def __create_edges_from_path(path: list):
+def create_edges_from_path(path: list):
     edges = list()
     for i in range(len(path)):
         # iter += 1
         if i == len(path) - 1:
             edges.append((path[0], path[i]))
         else:
-            if (path[i] == path[i+1]):
+            if path[i] == path[i + 1]:
                 print("ERROR <DUBLICATED>: ", (path[i], path[i+1]))
             edges.append((path[i], path[i+1]))
 
@@ -84,7 +84,7 @@ def visualize_tsp(vertexes: dict, path: list, filename='tsp_answer_path.jpg',
     :param with_labels: are there id of every vertex in picture
     :return: None
     """
-    edges = __create_edges_from_path(path)
+    edges = create_edges_from_path(path)
     graph = nx.Graph()
     # add vertexes
     for v_key in vertexes.keys():
