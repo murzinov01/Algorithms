@@ -24,8 +24,10 @@ def read_tsp(filename: str, dimensions=2, delimiter=' ',
         # read vertexes
         vertexes = dict()
         for line in f:
+            if line == 'EOF':
+                break
             line = line.split(delimiter)[:dimensions+1]
-            vertexes[int(line[0])] = tuple([float(line[i+1]) for i in range(dimensions)])
+            vertexes[int(line[0])] = tuple([float(line[i + 1]) for i in range(dimensions)])
 
     if return_top_info:
         return top_info, vertexes
@@ -56,23 +58,23 @@ def create_edges_from_path(path: list):
     for i in range(len(path)):
         # iter += 1
         if i == len(path) - 1:
-            edges.append((path[0], path[i]))
+            edges.append((path[i], path[0]))
         else:
             if path[i] == path[i + 1]:
                 print("ERROR <DUBLICATED>: ", (path[i], path[i+1]))
             edges.append((path[i], path[i+1]))
 
     # errors check
-    for edge1 in edges:
-        for edge2 in edges:
-            if edge1[0] == edge2[1] and edge1[1] == edge2[0]:
-                print("ERROR <DUBLICATED>: ", edge1, edge2)
+    # for edge1 in edges:
+    #     for edge2 in edges:
+    #         if edge1[0] == edge2[1] and edge1[1] == edge2[0]:
+    #             print("ERROR <DUBLICATED>: ", edge1, edge2)
 
     return edges
 
 
 def visualize_tsp(vertexes: dict, path: list, filename='tsp_answer_path.jpg',
-                  dpi=500, node_size=1.0, font_size=1.0, with_labels=False):
+                  dpi=500, node_size=1.0, font_size=1.0, with_labels=False, show=False):
     """
     Draw graph of tsp answer and save it as JPG
     :param vertexes: vertexes dict (get it from read_tsp() function)
@@ -97,7 +99,10 @@ def visualize_tsp(vertexes: dict, path: list, filename='tsp_answer_path.jpg',
             nx.get_node_attributes(graph, 'pos'),
             with_labels=with_labels, node_size=node_size, font_size=font_size,
             font_color='r', linewidths=0.0, node_color='g')
-    plt.savefig(filename, dpi=dpi)
+    if show:
+        plt.show(dpi=dpi)
+    else:
+        plt.savefig(filename, dpi=dpi)
 
 # v = read_tsp('/Users/sanduser/Downloads/traveling-santa-2018-prime-paths/cities.csv',
 #              top_banner=1, delimiter=',')
