@@ -31,7 +31,7 @@ class DataParser:
         return {"trucks": self.trucks,
                 "shops": self.shops,
                 "truck_capacity": self.truck_capacity,
-                "data": self.data}
+                "data": self.data_frame}
 
     def parse(self):
         with open(self.file_name, 'r', encoding='utf-8') as file:
