@@ -9,8 +9,8 @@ class DataParser:
         self.truck_capacity = 0
         self.data = list()
         self.data_frame = None
-        self.parse()
-        self.create_data_frame()
+        self._parse()
+        self._create_data_frame()
 
     def get_trucks(self) -> int:
         return self.trucks
@@ -24,7 +24,7 @@ class DataParser:
     def get_data(self) -> list:
         return self.data
 
-    def get_data_frame(self):
+    def get_data_frame(self) -> pd.DataFrame:
         return self.data_frame
 
     def get_params(self) -> dict:
@@ -33,7 +33,7 @@ class DataParser:
                 "truck_capacity": self.truck_capacity,
                 "data": self.data_frame}
 
-    def parse(self):
+    def _parse(self) -> None:
         with open(self.file_name, 'r', encoding='utf-8') as file:
             first_line = file.readline()
             self.shops, self.trucks, self.truck_capacity = (int(number.strip(" ")) for number in first_line.split())
@@ -41,6 +41,6 @@ class DataParser:
                 tokens = [int(number.strip(" ")) for number in line.split()]
                 self.data.append(tokens)
 
-    def create_data_frame(self):
+    def _create_data_frame(self) -> None:
         self.data_frame = pd.DataFrame(data=self.data, columns=["Id", "X", "Y", "Demand", "TimeOpen", "TimeClose",
                                                                 "Unloading"])
