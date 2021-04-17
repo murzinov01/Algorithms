@@ -298,24 +298,56 @@ class TabuVRP:
             result_data['reason'] = {string: reason for reason, string in zip(reasons, reasons_str)}
         return is_valid, penalties, result_data
 
-    @staticmethod
+   @staticmethod
     def move_customer(y):
+        """
+        Generates neighborhood of current decision by moving 1 vertex in a path
+        :param y: current decision
+        :return: list of candidates, where each candidate is a dict
+        """
         neighborhood = []
-        # concatenate all routes in to one path, delete double zero
+        decisions_hash_map = dict()
+        # concatenate all routes in to one path deleting double zero
         common_path = list(functools.reduce(lambda x1, x2: x1[:-1] + x2, y))
+        decisions_hash_map[tuple(common_path)] = True
         length = len(common_path)
         for vertex_index in range(length):
             moved_value = common_path[vertex_index]
-            # we do not move the 0
+            # we do not move the '0' vertex
             if moved_value == 0:
                 continue
-            for gap_index in range(length - 1):
-                # gap_index = after what vertex that gap is located
+            for gap_index in range(length-1):
+                # gap_index = after what vertex the gap is located
                 candidate = dict()
                 new_common_path = common_path[:vertex_index] + common_path[vertex_index + 1:]
-                new_common_path.insert(gap_index, moved_value)
-                delete_edges = []
-                delete_edges.append()
+                new_common_path.insert(gap_index if gap_index >= vertex_index else gap_index + 1, moved_value)
+                new_common_path = tuple(new_common_path)
+                # check repeated decisions
+                decision_exists = decisions_hash_map.get(new_common_path, False)
+                if decision_exists:
+                    continue
+                else:
+                    decisions_hash_map[new_common_path] = True
+                deleted_edges = list()
+                deleted_edges.append((common_path[vertex_index - 1], common_path[vertex_index]))
+                deleted_edges.append((common_path[vertex_index], common_path[vertex_index + 1]))
+                deleted_edges.append((common_path[gap_index], common_path[gap_index + 1]))
+                added_edges = list()
+                added_edges.append((new_common_path[vertex_index - 1], new_common_path[vertex_index]))
+                added_edges.append((new_common_path[gap_index - 1], new_common_path[gap_index]))
+                added_edges.append((new_common_path[gap_index], new_common_path[gap_index + 1]))
+                # divide common_path into routes
+                zero_indexes = [i for i, value in enumerate(new_common_path) if value == 0]
+                decision = [new_common_path[start: end + 1] for start, end in zip(zero_indexes, zero_indexes[1:])]
+                # candidate
+                candidate['common_path'] = new_common_path
+                candidate['decision'] = decision
+                candidate['deleted_edges'] = set(deleted_edges)
+                candidate['added_edges'] = set(added_edges)
+
+                neighborhood.append(candidate)
+
+        return neighborhood
 
     def _fitness(self, y) -> float:
         """
