@@ -2,8 +2,9 @@ import sys
 from tabulate import tabulate as tb
 from scipy.spatial import distance
 import functools
-from Algos.tsp_visualization import visualize_vrp
-from Algos.data_parser import DataParser
+import random
+from tsp_visualization import visualize_vrp
+from data_parser import DataParser
 
 
 def square_func(init, exponent):
@@ -278,9 +279,10 @@ class TabuVRP:
         if decision_penalty > 0:
             kwargs['exponent'] = self._invalid_counter
             stimulating_penalty = stimulating_func(*args, **kwargs)
-        return float(stimulating_penalty)
+        # return float(stimulating_penalty)
         # ANOTHER VARIANT OF PENALTY
         # return float(decision_penalty + stimulating_penalty)
+        return float(decision_penalty)
 
     def _check_all_shops_visited(self, y) -> (bool, bool):
         """
@@ -421,7 +423,11 @@ class TabuVRP:
                     for tabu in self._tabu_list]
         return functools.reduce(lambda x1, x2: x1 or x2, tabu_map)
 
-    def _run_tabu_search(self, neighborhood_func):
+    @staticmethod
+    def _random_sample_neighborhood(neighborhood, target_size):
+        return random.choices(neighborhood, k=target_size)
+
+    def _run_tabu_search(self, neighborhood_func, limit_neighborhood=-1):
         """
         Run general Tabu Search algorithm
         :param neighborhood_func: function to create neighborhood variety
@@ -435,7 +441,10 @@ class TabuVRP:
         best_candidate = best_solution
         while not self._stop_condition(iteration):
             iteration += 1
+            print(f'Iteration {iteration}')
             neighborhood = neighborhood_func(best_candidate)
+            if limit_neighborhood > 0:
+                neighborhood = self._random_sample_neighborhood(neighborhood, limit_neighborhood)
 
             if len(neighborhood) < 1:
                 print(f"* LOG *: neighborhood for '{best_candidate}' is empty")
@@ -446,7 +455,10 @@ class TabuVRP:
             best_candidate_fitness = self._fitness(best_candidate) + penalties
             best_candidate_tabu_values = set()
 
+            candidate_index = 0
             for candidate in neighborhood[1:]:
+                candidate_index += 1
+                print(f"\rcurrent candidate {candidate_index}             ", end='')
                 edges_moved = candidate.added_edges.union(candidate.deleted_edges)
                 is_valid, penalties, _ = self._check_valid_decision(candidate.y)
                 cur_fitness = self._fitness(candidate.y) + penalties
@@ -486,17 +498,17 @@ class TabuVRP:
             def log_iteration():
                 header = ('Iteration', 'Objective', 'Is valid', 'Penalties')
                 raw_fitness = self._fitness(best_candidate)
-                values = (iteration,
+                values = [(iteration,
                           best_candidate_fitness,
                           is_valid_best_candidate,
-                          best_candidate_fitness - raw_fitness)
-                print(tb(values, headers=header, tablefmt="github"))
-                print('--- Tabu List ---')
-                tabu_values = [f"{tabu.x} : {tabu.counter}" for tabu in self._tabu_list]
-                print(tb(tabu_values, tablefmt="github"))
+                          best_candidate_fitness - raw_fitness)]
                 print('\n')
+                print(tb(values, headers=header, tablefmt="github"))
+                # print('--- Tabu List ---')
+                # tabu_values = [(tabu.x, tabu.counter,) for tabu in self._tabu_list]
+                # print(tb(tabu_values, headers=('value', 'lifetime'), tablefmt="github"))
+                # print('\n')
 
-            print('log')
             log_iteration()
 
         return best_solution
@@ -522,7 +534,7 @@ class TabuVRP:
             self._save_decision(self._initial_decision, "init")
 
         # Start Tabu Search
-        best_solution = self._run_tabu_search(TabuVRP.move_customer)
+        best_solution = self._run_tabu_search(TabuVRP.move_customer, 300)
         print(" * END * : best solution is")
         print(best_solution)
 
@@ -551,7 +563,7 @@ def main():
 
     # Tabu Search
     my_tabu = TabuVRP()
-    my_tabu.fit(parser.get_params(), load_initial=False)
+    my_tabu.fit(parser.get_params(), load_initial=True)
 
     # Show initial decision
     # data_frame = parser.get_data_frame()

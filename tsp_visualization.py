@@ -103,7 +103,8 @@ def visualize_tsp(vertexes: dict, path: list, filename='tsp_answer_path.jpg',
 def visualize_vrp(vertexes: dict, path: list, filename='tsp_answer_path.jpg',
                  dpi=500, node_size=1.0, edge_size=2, font_size=10, with_labels=True):
     colors = ["#FF0000", "#00FF00", "#4682B4", "#FFFF00", "#FF8C00", "#C71585", "#9ACD32", "#8B008B", "#000080",
-              "#0000FF", "#ADFF2F", "#808000", "#FFD700", "#8A2BE2"]
+              "#FFBB00", "#CCFF00", "#4622B4", "#FFFFAA", "#CD8F00", "#35125F", "#9A2232", "#FACFDB", "#002233",
+              "#0000FF", "#ADFF2F", "#808000", "#FFD700", "#8A2BE2", "#8A2FF1"]
     G = nx.Graph()
     # pos = nx.spring_layout(G)  # positions for all nodes
 
