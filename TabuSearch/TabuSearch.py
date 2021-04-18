@@ -1,9 +1,9 @@
 import sys
-import math
-from data_parser import DataParser
+from tabulate import tabulate as tb
 from scipy.spatial import distance
 import functools
-import tsp_visualization as tspv
+from Algos.tsp_visualization import visualize_vrp
+from Algos.data_parser import DataParser
 
 
 def square_func(init, exponent):
@@ -41,7 +41,27 @@ class TabuVRP:
         def __eq__(self, other):
             return self.x == other.x
 
-    def __init__(self, tabu_lifetime=10):
+    class TabuCandidate:
+        def __init__(self, y, added_edges: set, deleted_edges: set):
+            self.y = y
+            self.added_edges = added_edges
+            self.deleted_edges = deleted_edges
+
+    def __init__(self, tabu_lifetime=10, max_iter=10000,
+                 lateness_penalty_coefficient=1,
+                 capacity_overload_penalty_coefficient=1):
+        """
+        Initiate VRP Tabu Search with hyperparameters
+        :param tabu_lifetime:
+        :param max_iter:
+        """
+        # hyperparameters
+        self._tabu_lifetime = tabu_lifetime
+        self._max_iter = max_iter
+        self._lateness_penalty_coefficient = lateness_penalty_coefficient
+        self._capacity_overload_penalty_coefficient = capacity_overload_penalty_coefficient
+
+        # changed via fit
         self.trucks_ = None
         self.shops_ = None
         self.truck_capacity_ = None
@@ -55,12 +75,7 @@ class TabuVRP:
         self._capacity_overload_penalty_coefficient = 1
         self._invalid_counter = 0
 
-        # Storage
-        self._storage_time_close = 0
-        self._storage_y = 0
-        self._storage_x = 0
-
-        # Initial decision
+        # initial decision
         self._initial_decision = None
         self._init_truck_number = 0
 
@@ -76,21 +91,38 @@ class TabuVRP:
         self.truck_capacity_ = x['truck_capacity']
         self.data_ = x['data']
 
+    def _save_decision(self, y: list, file_name: str, extension='.txt') -> None:
+        with open(file_name+extension, 'w', encoding='utf-8') as file:
+            for route in y:
+                file.write(", ".join([str(el) for el in route]) + '\n')
+
+        transformed_solution = self.transform_decision(y)
+        with open(file_name+'_transformed'+extension, 'w', encoding='utf-8') as file:
+            for route in transformed_solution:
+                line = " ".join([" ".join([str(el) for el in vertex_info]) for vertex_info in route])
+                file.write(line + '\n')
+
     @staticmethod
-    def _save_decision(file_name: str, decision: list) -> None:
-        with open(file_name, 'w', encoding='utf-8') as file:
-            for path in decision:
-                # print(", ".join([str(el) for el in path]) + '\n')
-                file.write(", ".join([str(el) for el in path]) + '\n')
+    def _load_decision(file_name: str) -> list:
+        """
+        Load decision from file in a format of list of routes
+        :param file_name: source file path
+        :return: list of routes
+        """
+        y = list()
+        with open(file_name, 'r', encoding='utf-8') as file:
+            for line in file:
+                y.append(tuple(map(int, line.split(', '))))
+        return y
+
+    """
+    Greedy initial decision
+    """
 
     def _create_initial_decision(self, mode="greedy"):
         if mode == "greedy":
             self._initial_decision, self._init_truck_number = self._init_greedy()
             # print(self.initial_decision, self.init_truck_number)
-
-    def _dist_to_storage(self, customer):
-        x_c, y_c = tuple(self.data_[["X", "Y"]].iloc[customer])
-        return math.sqrt((y_c - self._storage_y) ** 2 + (x_c - self._storage_x) ** 2)
 
     def _find_next_node(self, customer, time, capacity, path_memory) -> tuple:
         distances = self.distance_matrix_[customer]
@@ -101,12 +133,14 @@ class TabuVRP:
             if not path_memory[next_customer]:
                 time_open = self.data_["TimeOpen"][next_customer]
                 if time + dist < time_open:
-                    dist += time_open - time - dist
-                if dist < min_dist \
-                    and time + self._dist_to_storage(next_customer) + dist < self.data_["TimeClose"][0] \
-                    and time + dist < self.data_["TimeClose"][next_customer] \
+                    wait_dist = time_open - time
+                else:
+                    wait_dist = dist
+                if wait_dist < min_dist \
+                    and time + self.distance_matrix_[0][customer] + wait_dist < self.data_["TimeClose"][0] \
+                    and time + wait_dist < self.data_["TimeClose"][next_customer] \
                         and capacity > self.data_["Demand"][next_customer]:
-                    min_dist = dist
+                    min_dist = wait_dist
                     min_customer = next_customer
 
         return min_customer, min_dist
@@ -123,8 +157,6 @@ class TabuVRP:
         return min_customer, min_dist
 
     def _init_greedy(self):
-        self.storage_time_close = self.data_["TimeClose"][0]
-        self._storage_x, self._storage_y = tuple(self.data_[["X", "Y"]].iloc[0])
         decisions = list()
 
         # Create decisions for all number of trucks
@@ -134,8 +166,8 @@ class TabuVRP:
             print(f"Greedy with truck number = {truck_num}")
             decision = [{"path": [0], "cost": 0, "capacity": self.truck_capacity_, "invalid_count": 0}
                         for i in range(truck_num)]
-            visited_customers = [False for i in range(self.shops_)]
-            visited_counter = self.shops_
+            visited_customers = [False for i in range(self.shops_ + 1)]
+            visited_counter = self.shops_ + 1
             visited_customers[0] = True
             visited_counter -= 1
 
@@ -171,15 +203,15 @@ class TabuVRP:
 
             # Go to the storage
             for i in range(truck_num):
-                decision[i]["cost"] += self._dist_to_storage(decision[i]["path"][-1])
+                decision[i]["cost"] += self.distance_matrix_[0][decision[i]["path"][-1]]
                 decision[i]["path"].append(0)
             decisions.append(decision)
 
         # Find the best decision
-        return self._find_best_decision(decisions)
+        return self._find_best_greedy_decision(decisions)
 
     @staticmethod
-    def _find_best_decision(decisions: list):
+    def _find_best_greedy_decision(decisions: list):
         best_decision = []
         best_fitness = sys.float_info.max
         best_truck_number = 0
@@ -201,6 +233,10 @@ class TabuVRP:
                 best_truck_number = i + 1
         return [best_decision[i]["path"] for i in range(len(best_decision))], best_truck_number
 
+    """
+    Estimators and objective function
+    """
+
     def _estimate_excess(self, y) -> (float, int):
         """
         Estimate decision's overall time delay and capacity overload
@@ -215,7 +251,7 @@ class TabuVRP:
             for node1, node2 in zip(route, route[1:]):
                 route_time += self.distance_matrix_[node1, node2]
                 route_demand += self.data_['Demand'][node2]
-                opening_time, closing_time = self.data_[['TimeOpen', 'TimeClose']].iloc[node2]
+                opening_time, closing_time = self.data_.iloc[node2][['TimeOpen', 'TimeClose']]
                 if route_time < opening_time:
                     # wait for opening
                     route_time = opening_time
@@ -240,11 +276,8 @@ class TabuVRP:
                            + capacity_overload * self._capacity_overload_penalty_coefficient
         stimulating_penalty = 0.0
         if decision_penalty > 0:
-            self._invalid_counter += 1
             kwargs['exponent'] = self._invalid_counter
             stimulating_penalty = stimulating_func(*args, **kwargs)
-        else:
-            self._invalid_counter = 0
         return float(stimulating_penalty)
         # ANOTHER VARIANT OF PENALTY
         # return float(decision_penalty + stimulating_penalty)
@@ -280,7 +313,7 @@ class TabuVRP:
         lateness, capacity_overload = self._estimate_excess(y)
         penalties = self._estimate_penalty(lateness, capacity_overload, power_of_two)
         penalty_valid = False if penalties != 0.0 else True
-        vehicle_valid = False if len(y) <= self.trucks_ else True
+        vehicle_valid = False if len(y) > self.trucks_ else True
         is_all_shops_visited, is_all_shops_visited_once = self._check_all_shops_visited(y)
         start_end_valid = functools.reduce(lambda x1, x2: x1 and x2,
                                            [route[0] == route[-1] == 0 for route in y])
@@ -298,12 +331,31 @@ class TabuVRP:
             result_data['reason'] = {string: reason for reason, string in zip(reasons, reasons_str)}
         return is_valid, penalties, result_data
 
-   @staticmethod
-    def move_customer(y):
+    def _fitness(self, y) -> float:
+        """
+        Objective function od VRP algorithm
+        :param y: nested list of routes (each vehicle)
+        :return: summarized distance of all routes with time of unloading (float)
+        """
+        objective_value = 0
+        for route in y:
+            for node1, node2 in zip(route, route[1:]):
+                node_distance = self.distance_matrix_[node1, node2]
+                unloading = self.data_['Unloading'][node2]
+                # print(f'Node {node1}, {node2}:', node_distance, unloading)
+                objective_value += node_distance + unloading
+        return float(objective_value)
+
+    """
+    Neighborhoods
+    """
+
+    @classmethod
+    def move_customer(cls, y):
         """
         Generates neighborhood of current decision by moving 1 vertex in a path
         :param y: current decision
-        :return: list of candidates, where each candidate is a dict
+        :return: list of TabuCandidate
         """
         neighborhood = []
         decisions_hash_map = dict()
@@ -316,9 +368,8 @@ class TabuVRP:
             # we do not move the '0' vertex
             if moved_value == 0:
                 continue
-            for gap_index in range(length-1):
+            for gap_index in range(length - 1):
                 # gap_index = after what vertex the gap is located
-                candidate = dict()
                 new_common_path = common_path[:vertex_index] + common_path[vertex_index + 1:]
                 new_common_path.insert(gap_index if gap_index >= vertex_index else gap_index + 1, moved_value)
                 new_common_path = tuple(new_common_path)
@@ -340,57 +391,157 @@ class TabuVRP:
                 zero_indexes = [i for i, value in enumerate(new_common_path) if value == 0]
                 decision = [new_common_path[start: end + 1] for start, end in zip(zero_indexes, zero_indexes[1:])]
                 # candidate
-                candidate['common_path'] = new_common_path
-                candidate['decision'] = decision
-                candidate['deleted_edges'] = set(deleted_edges)
-                candidate['added_edges'] = set(added_edges)
-
+                candidate = cls.TabuCandidate(decision, set(deleted_edges), set(added_edges))
                 neighborhood.append(candidate)
 
         return neighborhood
 
-    def _fitness(self, y) -> float:
-        """
-        Objective function od VRP algorithm
-        :param y: nested list of routes (each vehicle)
-        :return: summarized distance of all routes with time of unloading (float)
-        """
-        objective_value = 0
-        for route in y:
-            for node1, node2 in zip(route, route[1:]):
-                node_distance = self.distance_matrix_[node1, node2]
-                unloading = self.data_['Unloading'][node2]
-                # print(f'Node {node1}, {node2}:', node_distance, unloading)
-                objective_value += node_distance + unloading
-        return float(objective_value)
+    """
+    General Tabu Search
+    """
 
-    def run_tabu_search(self):
+    def _stop_condition(self, iteration: int) -> bool:
+        """
+        Indicates if the algorithm should be stopped
+        :param iteration: current iteration of Tabu search
+        :return: True if should be stopped else False (bool)
+        """
+        return iteration > self._max_iter
+
+    def _check_tabu_list(self, tabu_values: set) -> bool:
+        """
+        Check value existence in tabu list
+        :param tabu_values: (set) value to check
+        :return: (bool) True if exists, else False
+        """
+        if len(self._tabu_list) < 1:
+            return False
+
+        tabu_map = [sum([tabu.compare(tabu_value) for tabu_value in tabu_values]) > 1
+                    for tabu in self._tabu_list]
+        return functools.reduce(lambda x1, x2: x1 or x2, tabu_map)
+
+    def _run_tabu_search(self, neighborhood_func):
+        """
+        Run general Tabu Search algorithm
+        :param neighborhood_func: function to create neighborhood variety
+        :return: None
+        """
+        iteration = 0
+
         best_solution = self._initial_decision
-        best_candidate = self._initial_decision
+        _, penalties, _ = self._check_valid_decision(best_solution)
+        best_solution_fitness = self._fitness(best_solution) + penalties
+        best_candidate = best_solution
+        while not self._stop_condition(iteration):
+            iteration += 1
+            neighborhood = neighborhood_func(best_candidate)
 
+            if len(neighborhood) < 1:
+                print(f"* LOG *: neighborhood for '{best_candidate}' is empty")
+                return best_solution
+
+            best_candidate = neighborhood[0].y
+            is_valid_best_candidate, penalties, _ = self._check_valid_decision(best_candidate)
+            best_candidate_fitness = self._fitness(best_candidate) + penalties
+            best_candidate_tabu_values = set()
+
+            for candidate in neighborhood[1:]:
+                edges_moved = candidate.added_edges.union(candidate.deleted_edges)
+                is_valid, penalties, _ = self._check_valid_decision(candidate.y)
+                cur_fitness = self._fitness(candidate.y) + penalties
+
+                if not self._check_tabu_list(edges_moved) and cur_fitness < best_candidate_fitness:
+                    best_candidate = candidate.y
+                    best_candidate_fitness = cur_fitness
+                    best_candidate_tabu_values = edges_moved
+                    is_valid_best_candidate = is_valid
+
+            if not is_valid_best_candidate:
+                self._invalid_counter += 1
+            else:
+                self._invalid_counter = 0
+
+            if best_candidate_fitness < best_solution_fitness and is_valid_best_candidate:
+                best_solution = best_candidate
+                best_solution_fitness = best_candidate_fitness
+                self._save_decision(best_solution, "best_solution")
+
+            to_delete = list()
+            # decrement lifetime
+            for tabu in self._tabu_list:
+                lifetime = tabu.dec_lifetime()
+                if lifetime <= 0:
+                    to_delete.append(tabu)
+            # delete dead
+            for tabu in to_delete:
+                self._tabu_list.remove(tabu)
+            # add new
+            for tabu_value in best_candidate_tabu_values:
+                self._tabu_list.append(self.TabuContainer(tabu_value, self._tabu_lifetime))
+
+            """
+            Logging
+            """
+            def log_iteration():
+                header = ('Iteration', 'Objective', 'Is valid', 'Penalties')
+                raw_fitness = self._fitness(best_candidate)
+                values = (iteration,
+                          best_candidate_fitness,
+                          is_valid_best_candidate,
+                          best_candidate_fitness - raw_fitness)
+                print(tb(values, headers=header, tablefmt="github"))
+                print('--- Tabu List ---')
+                tabu_values = [f"{tabu.x} : {tabu.counter}" for tabu in self._tabu_list]
+                print(tb(tabu_values, tablefmt="github"))
+                print('\n')
+
+            print('log')
+            log_iteration()
 
         return best_solution
 
-    def fit(self, x: dict):
+    def fit(self, x: dict, load_initial=False, initial_file_name='init.txt'):
         """
         Minimize objective function of VRP
         :param x: dict ("trucks": int, "shops": int, "truck_capacity": int, "data": pd.DataFrame)
+        :param load_initial: should we load initial decision from saved file, True if we should
+        :param initial_file_name: file name with initial decision
         :return: self
         """
         # Set params
         self._set_params(x)
         self.distance_matrix_ = distance.squareform(
-            distance.pdist(self.data_.loc[1:, ['X', 'Y']], metric='euclidean'))
+            distance.pdist(self.data_[['X', 'Y']], metric='euclidean'))
 
         # Create initial decision
-        self._create_initial_decision()
-        self._save_decision("init.txt", self._initial_decision)
+        if load_initial:
+            self._initial_decision = self._load_decision(initial_file_name)
+        else:
+            self._create_initial_decision()
+            self._save_decision(self._initial_decision, "init")
 
         # Start Tabu Search
-        # self.run_tabu_search()
+        best_solution = self._run_tabu_search(TabuVRP.move_customer)
+        print(" * END * : best solution is")
+        print(best_solution)
 
     def transform_decision(self, y):
-        pass
+        """
+        Transform decision into 'Bychkov Ilya' form
+        :param y: list of routes
+        :return: path matrix with delivery time to each customer
+        """
+        path_matrix = list()
+        for route in y:
+            customer_time_delivery = [(0, 0.0)]
+            route_time = 0.0
+            for vertex1, vertex2 in zip(route, route[1:]):
+                route_time += self.distance_matrix_[vertex1][vertex2] + self.data_['Unloading'][vertex2]
+                id_ = self.data_['Id'][vertex2]
+                customer_time_delivery.append((id_, route_time))
+            path_matrix.append(customer_time_delivery)
+        return path_matrix
 
 
 def main():
@@ -398,17 +549,15 @@ def main():
     parser = DataParser("I1.txt")
     print(parser.get_data_frame())
 
-    # Preprocessing
-    data_frame = parser.get_data_frame()
-    vertexes = {data_frame["Id"][i]: [data_frame["X"][i], data_frame["Y"][i]] for i in range(len(data_frame["Id"]))}
-
     # Tabu Search
     my_tabu = TabuVRP()
-    my_tabu.fit(parser.get_params())
+    my_tabu.fit(parser.get_params(), load_initial=False)
 
     # Show initial decision
-    init_decision = my_tabu.get_initial_decision()
-    tspv.visualize_vrp(vertexes, init_decision, node_size=20, edge_size=0.8, font_size=4, dpi=1000)
+    # data_frame = parser.get_data_frame()
+    # vertexes = {data_frame["Id"][i]: [data_frame["X"][i], data_frame["Y"][i]] for i in range(len(data_frame["Id"]))}
+    # init_decision = my_tabu.get_initial_decision()
+    # visualize_vrp(vertexes, init_decision, node_size=20, edge_size=0.8, font_size=4, dpi=1000)
 
 
 if __name__ == '__main__':
